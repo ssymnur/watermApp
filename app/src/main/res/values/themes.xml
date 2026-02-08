@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.WatermApp" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Splash Screen arka plan rengi -->
+        <item name="android:windowSplashScreenBackground">@color/white</item>
 
-    <style name="Theme.WatermApp" parent="android:Theme.Material.Light.NoActionBar" />
+        <!-- Ortadaki animasyonlu logo -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+
+        <!-- Logo animasyon süresi (ms) -->
+        <item name="android:windowSplashScreenAnimationDuration">1000</item>
+
+        <!-- Logo arka plan rengi -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/white</item>
+
+        <!-- Android 13+ cihazlarda her zaman logoyu göster -->
+        <item name="android:windowSplashScreenBehavior">icon_preferred</item>
+    </style>
 </resources>

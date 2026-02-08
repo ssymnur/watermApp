@@ -39,6 +39,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.compose.ui:ui-text")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -48,10 +49,15 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation("androidx.activity:activity-compose:1.8.0")
     implementation("androidx.compose.material3:material3:1.1.0")
+
+    //splash
+    implementation("androidx.core:core-splashscreen:1.0.0")
+    //gson
+    implementation("com.google.code.gson:gson:2.10.1")
+
+
     //firebase
     //implementation(platform("com.google.firebase:firebase-bom:34.8.0"))
-
-
     implementation("com.google.firebase:firebase-firestore-ktx:25.1.1")
     implementation("com.google.firebase:firebase-analytics:22.0.0")
 
