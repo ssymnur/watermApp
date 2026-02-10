@@ -27,10 +27,17 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import android.net.Uri
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalView
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.ShoppingCart
+
+
+
+
 
 
 class MainActivity : ComponentActivity() {
@@ -50,6 +57,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+//sepetteki üürnler ve müşteri kayıt formunu firebase kaydet
+data class Customer(
+    val customerName: String = "",
+    val companyName: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val staffName: String = ""
+)
+
+data class OrderItem(
+    val model: String = "",
+    val quantity: Int = 0,
+    val price: Double = 0.0
+)
+
+data class Order(
+    val customer: Customer = Customer(),
+    val items: List<OrderItem> = emptyList(),
+    val total: Double = 0.0,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 data class CartItem(
     val urun: Urun,
@@ -132,6 +160,11 @@ fun AppNavigator() {
         composable("cart") {
             CartScreen(navController)
         }
+
+        composable("customerForm") {
+            CustomerFormScreen(navController)
+        }
+
         composable(
             "evselDetail/{kategoriAdi}",
             arguments = listOf(navArgument("kategoriAdi") { type = NavType.StringType })
@@ -449,6 +482,7 @@ fun loadEvselData(context: Context): Root {
 
     return Gson().fromJson(jsonString, Root::class.java)
 }
+
 @Composable
 fun CategoryButton(
     title: String,
@@ -470,6 +504,8 @@ fun CartScreen(navController: NavHostController) {
 
     val cart = CartManager.cart
     val total = CartManager.totalPrice()
+    val context = LocalContext.current
+    val view = LocalView.current
 
     Scaffold(
         topBar = {
@@ -478,6 +514,22 @@ fun CartScreen(navController: NavHostController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
+                    }
+                },
+                actions = {
+
+                    // ✅ PRINT BUTONU
+                    IconButton(onClick = {
+                        printView(context, view)
+                    }) {
+                        Icon(Icons.Default.Print, contentDescription = "Yazdır")
+                    }
+
+                    // ✅ MÜŞTERİ KAYDET BUTONU
+                    IconButton(onClick = {
+                        navController.navigate("customerForm")
+                    }) {
+                        Icon(Icons.Default.Home, contentDescription = "Müşteri Kaydet")
                     }
                 }
             )
@@ -506,13 +558,11 @@ fun CartScreen(navController: NavHostController) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
 
-                            // SOL → ürün adı
                             Text(
                                 text = item.urun.urun_model,
                                 modifier = Modifier.weight(1f)
                             )
 
-                            // SAĞ → adet
                             Text(
                                 text = "Adet: ${item.quantity.value}",
                                 style = MaterialTheme.typography.titleMedium
@@ -529,6 +579,7 @@ fun CartScreen(navController: NavHostController) {
         }
     }
 }
+
 
 
 
@@ -623,6 +674,156 @@ fun EditProductScreen(
         }
     }
 }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CustomerFormScreen(navController: NavHostController) {
+
+    var customerName by rememberSaveable { mutableStateOf("") }
+    var companyName by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var staffName by rememberSaveable { mutableStateOf("") }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
+    Scaffold(
+
+        topBar = {
+            TopAppBar(
+                title = { Text("Müşteri Kaydı") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
+                    }
+                }
+            )
+        },
+
+        bottomBar = {
+            BottomAppBar {
+                Button(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    onClick = {
+
+                        // ✅ müşteri oluştur
+                        val customer = Customer(
+                            customerName = customerName,
+                            companyName = companyName,
+                            phone = phone,
+                            email = email,
+                            staffName = staffName
+                        )
+
+                        // ✅ sepet ürünlerini al
+                        val items = CartManager.cart.map {
+                            OrderItem(
+                                model = it.urun.urun_model,
+                                quantity = it.quantity.value,
+                                price = it.urun.fiyat_usd ?: 0.0
+                            )
+                        }
+
+                        // ✅ sipariş oluştur
+                        val order = Order(
+                            customer = customer,
+                            items = items,
+                            total = CartManager.totalPrice()
+                        )
+
+                        // ✅ firebase kaydet
+                        saveOrderToFirebase(order)
+
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Sipariş kaydedildi ✅")
+                            delay(1200)
+
+                            CartManager.cart.clear()
+                            navController.popBackStack()
+                        }
+                    }
+                ) {
+                    Text("Kaydet")
+                }
+            }
+        },
+
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+
+    ) { padding ->
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+
+            item {
+                OutlinedTextField(
+                    value = customerName,
+                    onValueChange = { customerName = it },
+                    label = { Text("Müşteri Adı") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = companyName,
+                    onValueChange = { companyName = it },
+                    label = { Text("Şirket Adı") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("Telefon") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Mail Adresi") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = staffName,
+                    onValueChange = { staffName = it },
+                    label = { Text("Personel Adı") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+
+fun saveOrderToFirebase(order: Order) {
+    val db = Firebase.firestore
+
+    db.collection("orders")
+        .add(order)
+        .addOnSuccessListener {
+            println("Sipariş kaydedildi")
+        }
+        .addOnFailureListener {
+            println("Hata: ${it.message}")
+        }
+}
+
 
 
 
