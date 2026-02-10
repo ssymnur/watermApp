@@ -13,13 +13,14 @@ data class Urun(
     val id: String = "",
     val kategori: String = "",
     val urun_model: String = "",
-    val marka: String? = null,
-    val pompa: String? = null,
-    val asama: String? = null,
-    val membran_gpd: Double? = null,
-    val tank_galon: Double? = null,
-    val urun_kodu: Int? = null,
-    val fiyat_usd: Double? = null,
-    val ozellikler: String? = null
+    val marka: String? = "",
+    val pompa: String? = "",
+    val asama: String? = "",
+    val membran_gpd: Double? = 0.0,
+    val tank_galon: Double? = 0.0,
+    val urun_kodu: Int? = 0,
+    val fiyat_usd: Double? = 0.0,
+    val ozellikler: String? = ""
 )
+
 

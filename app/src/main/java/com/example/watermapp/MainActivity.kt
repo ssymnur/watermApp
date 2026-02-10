@@ -1,6 +1,5 @@
 package com.example.watermapp
 
-import android.R.attr.data
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -26,6 +25,8 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import android.net.Uri
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalView
 import com.google.firebase.Firebase
@@ -33,10 +34,8 @@ import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.ShoppingCart
-
-
-
+import androidx.navigation.NavController
+import com.google.firebase.firestore.FirebaseFirestore
 
 
 
@@ -52,10 +51,38 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            AppNavigator()
+
+            val context = LocalContext.current
+
+            val startDestination =
+                if (LoginPrefs.isLoggedIn(context)) "categories"
+                else "login"
+
+            AppNavigator(startDestination)
         }
     }
 }
+
+
+//sharedpreferences
+object LoginPrefs {
+
+    fun saveLogin(context: Context, isStaff: Boolean) {
+        val prefs = context.getSharedPreferences("login", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("is_staff", isStaff).apply()
+    }
+
+    fun isLoggedIn(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("login", Context.MODE_PRIVATE)
+        return prefs.getBoolean("is_staff", false)
+    }
+
+    fun logout(context: Context) {
+        val prefs = context.getSharedPreferences("login", Context.MODE_PRIVATE)
+        prefs.edit().clear().apply()
+    }
+}
+
 
 //sepetteki üürnler ve müşteri kayıt formunu firebase kaydet
 data class Customer(
@@ -126,10 +153,14 @@ object CartManager {
 }
 
 @Composable
-fun AppNavigator() {
+fun AppNavigator(startDestination: String) {
+
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "login") {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
 
         composable(
             "edit/{productId}",
@@ -155,6 +186,19 @@ fun AppNavigator() {
             }
 
 
+        }
+        composable("add_product/{mainCategory}") { backStackEntry ->
+            val mainCategory = backStackEntry.arguments?.getString("mainCategory") ?: ""
+            AddProductCategoryScreen(navController, mainCategory)
+        }
+
+        composable("add_product_form/{category}") { backStackEntry ->
+            val category = backStackEntry.arguments?.getString("category") ?: ""
+            AddProductFormScreen(navController, category)
+        }
+
+        composable("orders") {
+            OrdersScreen(navController)
         }
 
         composable("cart") {
@@ -196,6 +240,7 @@ fun AppNavigator() {
 }
 @Composable
 fun LoginScreen(navController: NavHostController) {
+    val context = LocalContext.current
 
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -249,8 +294,10 @@ fun LoginScreen(navController: NavHostController) {
             Button(onClick = {
                 if (username == "waterm" && password == "waterm123") {
                     CartManager.SessionManager.isStaff = true
+                    LoginPrefs.saveLogin(context, true)
                     navController.navigate("categories")
-                } else {
+                }
+                else {
                     errorText = "Hatalı giriş!"
                 }
             }) {
@@ -283,7 +330,7 @@ fun CategoryScreen(navController: NavHostController) {
         CategoryButton("Peyzaj", "peyzaj", navController)
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun EvselScreen(navController: NavHostController) {
 
@@ -299,18 +346,7 @@ fun EvselScreen(navController: NavHostController) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Evsel Ürün Kategorileri") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
-                    }
-                }
-            )
-        }
-    ) { padding ->
+    AppScaffold("Evsel Ürün Kategorileri", navController) { padding ->
 
         LazyColumn(
             modifier = Modifier
@@ -351,13 +387,24 @@ fun EvselDetailScreen(
 
     var urunler by remember { mutableStateOf<List<Urun>>(emptyList()) }
 
-    LaunchedEffect(Unit) {
-        ProductRepository.getProducts {
-            urunler = it.filter { u -> u.kategori == kategoriAdi }
+    // 🔥 FIREBASE CANLI LİSTE
+    DisposableEffect(kategoriAdi) {
+
+        val listener = FirebaseFirestore.getInstance()
+            .collection("products")
+            .whereEqualTo("kategori", kategoriAdi)
+            .addSnapshotListener { snapshot, _ ->
+                urunler = snapshot?.documents?.map { doc ->
+                    doc.toObject(Urun::class.java)!!.copy(id = doc.id)
+                } ?: listOf()
+            }
+
+        onDispose {
+            listener.remove()
         }
     }
 
-    val cart = CartManager.cart // recomposition tetikler
+
 
     Scaffold(
 
@@ -392,80 +439,73 @@ fun EvselDetailScreen(
                 .padding(16.dp)
         ) {
 
-                items(urunler) { urun ->
+            items(urunler) { urun ->
 
-                    val qty = CartManager.getQuantity(urun)
+                val qty = CartManager.getQuantity(urun)
 
-                    Card(
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                ) {
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp)
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+
+                        var expanded by remember { mutableStateOf(false) }
+
+                        Column(modifier = Modifier.weight(1f)) {
+
+                            Text(urun.urun_model, style = MaterialTheme.typography.titleMedium)
+                            Text("Fiyat: ${urun.fiyat_usd ?: "-"} USD")
+                            urun.marka?.let { Text("Marka: $it") }
+                            urun.pompa?.let { Text("Pompa: $it") }
+                            urun.asama?.let { Text("Aşama: $it") }
+                            urun.membran_gpd?.let { Text("Membran: $it GPD") }
+                            urun.tank_galon?.let { Text("Tank: $it Galon") }
+
+
+                            TextButton(onClick = { expanded = !expanded }) {
+                                Text(if (expanded) "Gizle" else "Açıklama")
+                            }
+
+                            if (expanded) {
+                                Text(
+                                    text = urun.ozellikler ?: "Bilgi yok",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = Int.MAX_VALUE
+                                )
+                            }
+
+                            if (CartManager.SessionManager.isStaff) {
+                                TextButton(onClick = {
+                                    navController.navigate("edit/${urun.id}")
+                                }) {
+                                    Text("Düzenle")
+                                }
+                            }
+                        }
+
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
 
-                            // SOL TARAF → ürün bilgisi
-                            var expanded by remember { mutableStateOf(false) }
-
-                            Column(modifier = Modifier.weight(1f)) {
-
-                                Text(urun.urun_model, style = MaterialTheme.typography.titleMedium)
-
-                                Text("Marka: ${urun.marka ?: "-"}")
-                                Text("Pompa: ${urun.pompa ?: "-"}")
-                                Text("Aşama: ${urun.asama ?: "-"}")
-                                Text("Membran: ${urun.membran_gpd ?: "-"} GPD")
-                                Text("Tank: ${urun.tank_galon ?: "-"} Galon")
-                                Text("Ürün Kodu: ${urun.urun_kodu ?: "-"}")
-                                Text("Fiyat: ${urun.fiyat_usd ?: "-"} USD")
-
-                            TextButton(onClick = { expanded = !expanded }) {
-                                    Text(if (expanded) "Özellikleri gizle" else "Özellikleri göster")
-                                }
-
-                                if (expanded) {
-                                    Text(
-                                        text = urun.ozellikler ?: "Bilgi yok",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-
-                                if (CartManager.SessionManager.isStaff) {
-                                    TextButton(onClick = {
-                                        navController.navigate("edit/${urun.id}")
-                                    }) {
-                                        Text("Düzenle")
-                                    }
-                                }
-
+                            IconButton(onClick = { CartManager.remove(urun) }) {
+                                Text("-", style = MaterialTheme.typography.headlineMedium)
                             }
 
-                            // SAĞ TARAF → adet kontrolü
-                            val qty = CartManager.getQuantity(urun)
+                            Text(
+                                text = qty.toString(),
+                                modifier = Modifier.width(32.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                style = MaterialTheme.typography.titleMedium
+                            )
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End
-                            ) {
-
-                                IconButton(onClick = { CartManager.remove(urun) }) {
-                                    Text("-", style = MaterialTheme.typography.headlineMedium)
-                                }
-
-                                Text(
-                                    text = qty.toString(),
-                                    modifier = Modifier.width(32.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-
-                                IconButton(onClick = { CartManager.add(urun) }) {
-                                    Text("+", style = MaterialTheme.typography.headlineMedium)
-                                }
+                            IconButton(onClick = { CartManager.add(urun) }) {
+                                Text("+", style = MaterialTheme.typography.headlineMedium)
                             }
                         }
                     }
@@ -473,6 +513,8 @@ fun EvselDetailScreen(
             }
         }
     }
+}
+
 
 fun loadEvselData(context: Context): Root {
     val jsonString = context.assets
@@ -529,7 +571,7 @@ fun CartScreen(navController: NavHostController) {
                     IconButton(onClick = {
                         navController.navigate("customerForm")
                     }) {
-                        Icon(Icons.Default.Home, contentDescription = "Müşteri Kaydet")
+                        Icon(Icons.Default.Person, contentDescription = "Müşteri Kaydet")
                     }
                 }
             )
@@ -591,8 +633,7 @@ fun SimplePage(title: String) {
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
     }
-}
-@OptIn(ExperimentalMaterial3Api::class)
+}@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProductScreen(
     urun: Urun,
@@ -609,6 +650,7 @@ fun EditProductScreen(
     var kod by rememberSaveable { mutableStateOf(urun.urun_kodu?.toString() ?: "") }
     var fiyat by rememberSaveable { mutableStateOf(urun.fiyat_usd?.toString() ?: "") }
 
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -633,13 +675,13 @@ fun EditProductScreen(
             item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
             item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
             item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
-            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran GPD") }) }
-            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank Galon") }) }
-            item { OutlinedTextField(kod, { kod = it }, label = { Text("Ürün Kodu") }) }
+            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran") }) }
+            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank") }) }
+            item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
             item { OutlinedTextField(fiyat, { fiyat = it }, label = { Text("Fiyat USD") }) }
 
+            // ✅ KAYDET
             item {
-
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
@@ -659,10 +701,7 @@ fun EditProductScreen(
                         ProductRepository.updateProduct(productId, updated)
 
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = "Değişiklikler kaydedildi",
-                                duration = SnackbarDuration.Short
-                            )
+                            snackbarHostState.showSnackbar("Değişiklikler kaydedildi")
                             delay(1200)
                             navController.popBackStack()
                         }
@@ -671,9 +710,50 @@ fun EditProductScreen(
                     Text("Kaydet")
                 }
             }
+
+            // ✅ SİL
+            item {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    onClick = { showDeleteDialog = true }
+                ) {
+                    Text("Sil")
+                }
+            }
+        }
+
+        // ✅ DELETE DIALOG
+        if (showDeleteDialog) {
+            AlertDialog(
+                onDismissRequest = { showDeleteDialog = false },
+                title = { Text("Ürünü sil") },
+                text = { Text("Silmek istediğinize emin misiniz?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            FirebaseFirestore.getInstance()
+                                .collection("products")
+                                .document(productId)
+                                .delete()
+
+                            showDeleteDialog = false
+                            navController.popBackStack()
+                        }
+                    ) { Text("Evet") }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showDeleteDialog = false }
+                    ) { Text("Hayır") }
+                }
+            )
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerFormScreen(navController: NavHostController) {
@@ -824,9 +904,252 @@ fun saveOrderToFirebase(order: Order) {
         }
 }
 
+//müşteri liste ekranı
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OrdersScreen(navController: NavHostController) {
+
+    var orders by remember { mutableStateOf<List<Order>>(emptyList()) }
+
+    DisposableEffect(Unit) {
+
+        val listener = Firebase.firestore.collection("orders")
+            .addSnapshotListener { snapshot, _ ->
+                orders = snapshot?.documents?.mapNotNull {
+                    it.toObject(Order::class.java)
+                } ?: emptyList()
+            }
+
+        onDispose {
+            listener.remove()
+        }
+    }
+
+
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Müşteri Kayıtları") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+
+            items(orders) { order ->
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+
+                        Text("Müşteri: ${order.customer.customerName}")
+                        Text("Şirket: ${order.customer.companyName}")
+                        Text("Telefon: ${order.customer.phone}")
+                        Text("Personel: ${order.customer.staffName}")
+
+                        Text("Tarih: ${formatDate(order.timestamp)}")
+
+                        Spacer(Modifier.height(6.dp))
+
+                        order.items.forEach {
+                            Text("- ${it.model} x${it.quantity}")
+                        }
+
+                        Text("Toplam: ${order.total} USD")
+                    }
+                }
+            }
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppScaffold(
+    title: String,
+    navController: NavHostController,
+    content: @Composable (PaddingValues) -> Unit
+) {
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+
+                actions = {
+                    IconButton(onClick = {
+                        navController.navigate("add_product/evsel")
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
+                    }
+                }
+            )
+        },
+
+        bottomBar = {
+            BottomAppBar {
+                IconButton(onClick = {
+                    navController.navigate("categories")
+                }) {
+                    Icon(Icons.Default.Home, contentDescription = "Ana sayfa")
+                }
+            }
+        }
+
+    ) { padding ->
+        content(padding)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddProductCategoryScreen(navController: NavController, mainCategory: String) {
+
+    val categories = listOf(
+        "Direkt akış cihazlar",
+        "Ekipmanlar",
+        "Tezgah altı açık kasa cihazlar",
+        "Tezgah altı kabinli cihazlar"
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Ürün Ekle") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, null)
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            BottomAppBar {
+                IconButton(onClick = {
+                    navController.navigate("categories")
+                }) {
+                    Icon(Icons.Default.Home, null)
+                }
+            }
+        }
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            categories.forEach { cat ->
+                Button(
+                    onClick = {
+                        navController.navigate("add_product_form/$cat")
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Text(cat)
+                }
+            }
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddProductFormScreen(navController: NavController, category: String) {
+
+    var name by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+
+    val db = FirebaseFirestore.getInstance()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Ürün Ekle - $category") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, null)
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            BottomAppBar {
+                IconButton(onClick = {
+                    navController.navigate("categories")
+                }) {
+                    Icon(Icons.Default.Home, null)
+                }
+            }
+        }
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+
+            OutlinedTextField(name, { name = it }, label = { Text("Ürün adı") })
+            OutlinedTextField(price, { price = it }, label = { Text("Fiyat") })
+            OutlinedTextField(desc, { desc = it }, label = { Text("Açıklama") })
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+
+                    val product = hashMapOf(
+                        "urun_model" to name,
+                        "fiyat_usd" to price.toDoubleOrNull(),
+                        "ozellikler" to desc,
+                        "kategori" to category
+                    )
+
+                    db.collection("products")
+                        .add(product)
+                        .addOnSuccessListener {
+                            navController.popBackStack()
+                        }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Kaydet")
+            }
+        }
+    }
+}
+
+
 
 
 
 
 fun String.toNavArg(): String = Uri.encode(this)
 fun String.fromNavArg(): String = Uri.decode(this)
+
+fun formatDate(time: Long): String {
+    val sdf = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(time))
+}
+
