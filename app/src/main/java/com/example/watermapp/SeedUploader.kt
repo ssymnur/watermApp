@@ -17,7 +17,7 @@ object SeedUploader {
             kategori.urunler.forEach { urun ->
 
                 val map = hashMapOf(
-                    "kategori" to kategori.kategoriAdi,
+                    "kategori" to kategori.kategoriAdi.normalizeCategory(),
                     "urun_model" to urun.urun_model,
                     "marka" to urun.marka,
                     "pompa" to urun.pompa,
@@ -28,6 +28,7 @@ object SeedUploader {
                     "fiyat_usd" to urun.fiyat_usd,
                     "ozellikler" to urun.ozellikler
                 )
+
 
                 db.collection("products")
                     .document(urun.urun_kodu.toString())

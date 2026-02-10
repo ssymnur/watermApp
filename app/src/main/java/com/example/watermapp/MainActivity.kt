@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import android.net.Uri
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,8 +36,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Print
 import androidx.navigation.NavController
+import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.FirebaseFirestore
-
 
 
 class MainActivity : ComponentActivity() {
@@ -54,15 +55,19 @@ class MainActivity : ComponentActivity() {
 
             val context = LocalContext.current
 
+            CartManager.SessionManager.isStaff =
+                LoginPrefs.isLoggedIn(context)
+
             val startDestination =
                 if (LoginPrefs.isLoggedIn(context)) "categories"
                 else "login"
 
-            AppNavigator(startDestination)
+            WaterAppTheme {
+                AppNavigator(startDestination)
+            }
         }
     }
 }
-
 
 //sharedpreferences
 object LoginPrefs {
@@ -192,6 +197,13 @@ fun AppNavigator(startDestination: String) {
             AddProductCategoryScreen(navController, mainCategory)
         }
 
+        composable("categories") {
+            MainLayout(navController) {
+                CategoryScreen(navController)
+            }
+        }
+
+
         composable("add_product_form/{category}") { backStackEntry ->
             val category = backStackEntry.arguments?.getString("category") ?: ""
             AddProductFormScreen(navController, category)
@@ -224,9 +236,6 @@ fun AppNavigator(startDestination: String) {
             LoginScreen(navController)
         }
 
-        composable("categories") {
-            CategoryScreen(navController)
-        }
         composable("evsel") {
             EvselScreen(navController)
         }
@@ -309,7 +318,7 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(navController: NavHostController) {
 
@@ -328,6 +337,18 @@ fun CategoryScreen(navController: NavHostController) {
         CategoryButton("Endüstriyel", "endustriyel", navController)
         CategoryButton("Kimyasal", "kimyasal", navController)
         CategoryButton("Peyzaj", "peyzaj", navController)
+
+        // ✅ SADECE PERSONEL GÖRÜR
+        if (CartManager.SessionManager.isStaff) {
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { navController.navigate("orders") }
+            ) {
+                Text("Müşteri Kayıtları")
+            }
+        }
     }
 }
 
@@ -358,6 +379,11 @@ fun EvselScreen(navController: NavHostController) {
             items(kategoriler) { kategori ->
 
                 Card(
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(6.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
@@ -369,14 +395,15 @@ fun EvselScreen(navController: NavHostController) {
                 ) {
                     Text(
                         text = kategori,
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.headlineSmall
+                        modifier = Modifier.padding(20.dp),
+                        style = MaterialTheme.typography.titleLarge
                     )
                 }
             }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -657,7 +684,14 @@ fun EditProductScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Ürünü Düzenle") })
+            TopAppBar(
+                title = { Text("Ürünü Düzenle") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    }
+                }
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
 
@@ -910,10 +944,15 @@ fun saveOrderToFirebase(order: Order) {
 @Composable
 fun OrdersScreen(navController: NavHostController) {
 
+    if (!CartManager.SessionManager.isStaff) {
+        LaunchedEffect(Unit) { navController.popBackStack() }
+        return
+    }
+
     var orders by remember { mutableStateOf<List<Order>>(emptyList()) }
+    var search by remember { mutableStateOf("") }
 
     DisposableEffect(Unit) {
-
         val listener = Firebase.firestore.collection("orders")
             .addSnapshotListener { snapshot, _ ->
                 orders = snapshot?.documents?.mapNotNull {
@@ -921,12 +960,14 @@ fun OrdersScreen(navController: NavHostController) {
                 } ?: emptyList()
             }
 
-        onDispose {
-            listener.remove()
-        }
+        onDispose { listener.remove() }
     }
 
-
+    // 🔍 filtrelenmiş liste
+    val filtered = orders.filter {
+        it.customer.customerName.contains(search, true) ||
+                it.customer.companyName.contains(search, true)
+    }
 
     Scaffold(
         topBar = {
@@ -941,42 +982,54 @@ fun OrdersScreen(navController: NavHostController) {
         }
     ) { padding ->
 
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
 
-            items(orders) { order ->
+            // 🔍 ARAMA KUTUSU
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                label = { Text("Müşteri / Şirket ara") },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                ) {
-                    Column(Modifier.padding(12.dp)) {
+            Spacer(Modifier.height(10.dp))
 
-                        Text("Müşteri: ${order.customer.customerName}")
-                        Text("Şirket: ${order.customer.companyName}")
-                        Text("Telefon: ${order.customer.phone}")
-                        Text("Personel: ${order.customer.staffName}")
+            LazyColumn {
 
-                        Text("Tarih: ${formatDate(order.timestamp)}")
+                items(filtered) { order ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
 
-                        Spacer(Modifier.height(6.dp))
+                            Text("Müşteri: ${order.customer.customerName}")
+                            Text("Şirket: ${order.customer.companyName}")
+                            Text("Telefon: ${order.customer.phone}")
+                            Text("Personel: ${order.customer.staffName}")
+                            Text("Tarih: ${formatDate(order.timestamp)}")
 
-                        order.items.forEach {
-                            Text("- ${it.model} x${it.quantity}")
+                            Spacer(Modifier.height(6.dp))
+
+                            order.items.forEach {
+                                Text("- ${it.model} x${it.quantity}")
+                            }
+
+                            Text("Toplam: ${order.total} USD")
                         }
-
-                        Text("Toplam: ${order.total} USD")
                     }
                 }
             }
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScaffold(
@@ -1008,14 +1061,18 @@ fun AppScaffold(
 
         bottomBar = {
             BottomAppBar {
-                IconButton(onClick = {
-                    navController.navigate("categories")
-                }) {
-                    Icon(Icons.Default.Home, contentDescription = "Ana sayfa")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    IconButton(onClick = {
+                        navController.navigate("categories")
+                    }) {
+                        Icon(Icons.Default.Home, contentDescription = "Ana sayfa")
+                    }
                 }
             }
         }
-
     ) { padding ->
         content(padding)
     }
@@ -1023,14 +1080,141 @@ fun AppScaffold(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddProductCategoryScreen(navController: NavController, mainCategory: String) {
+fun AddProductCategoryScreen(
+    navController: NavHostController,
+    mainCategory: String
+) {
 
-    val categories = listOf(
-        "Direkt akış cihazlar",
-        "Ekipmanlar",
-        "Tezgah altı açık kasa cihazlar",
-        "Tezgah altı kabinli cihazlar"
-    )
+    val realCategory = mainCategory.fromNavArg()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Kategori Seç") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, null)
+                    }
+                }
+            )
+        }
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+
+            Text(
+                text = "Ürün eklenecek kategori:",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = realCategory,
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    navController.navigate(
+                        "add_product_form/${realCategory.toNavArg()}"
+                    )
+                }
+            ) {
+                Text("Bu kategoriye ürün ekle")
+            }
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainLayout(
+    navController: NavHostController,
+    content: @Composable () -> Unit
+) {
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("WaterApp") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, "Geri")
+                    }
+                }
+            )
+        },
+
+        bottomBar = {
+            BottomAppBar {
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    IconButton(onClick = {
+                        navController.navigate("categories") {
+                            popUpTo("categories") { inclusive = true }
+                        }
+                    }) {
+                        Icon(Icons.Default.Home, "Ana Sayfa")
+                    }
+
+                    IconButton(onClick = {
+                        navController.navigate("cart")
+                    }) {
+                        Icon(Icons.Default.ShoppingCart, "Sepet")
+                    }
+
+                    // ✅ sadece personel görür
+                    if (CartManager.SessionManager.isStaff) {
+                        IconButton(onClick = {
+                            navController.navigate("orders")
+                        }) {
+                            Icon(Icons.Default.Person, "Müşteriler")
+                        }
+                    }
+                }
+            }
+        }
+
+    ) { padding ->
+        Box(Modifier.padding(padding)) {
+            content()
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddProductFormScreen(
+    navController: NavHostController,
+    category: String
+) {
+
+    val realCategory = category.fromNavArg()
+
+    var model by rememberSaveable { mutableStateOf("") }
+    var marka by rememberSaveable { mutableStateOf("") }
+    var pompa by rememberSaveable { mutableStateOf("") }
+    var asama by rememberSaveable { mutableStateOf("") }
+    var membran by rememberSaveable { mutableStateOf("") }
+    var tank by rememberSaveable { mutableStateOf("") }
+    var kod by rememberSaveable { mutableStateOf("") }
+    var fiyat by rememberSaveable { mutableStateOf("") }
+    var ozellikler by rememberSaveable { mutableStateOf("") }
+
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -1038,112 +1222,69 @@ fun AddProductCategoryScreen(navController: NavController, mainCategory: String)
                 title = { Text("Ürün Ekle") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
                     }
                 }
             )
         },
-        bottomBar = {
-            BottomAppBar {
-                IconButton(onClick = {
-                    navController.navigate("categories")
-                }) {
-                    Icon(Icons.Default.Home, null)
-                }
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
 
-        Column(
+        LazyColumn(
             modifier = Modifier
+                .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            categories.forEach { cat ->
+
+            item { Text("Kategori: $realCategory") }
+
+            item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
+            item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
+            item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
+            item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
+            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran GPD") }) }
+            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank Galon") }) }
+            item { OutlinedTextField(kod, { kod = it }, label = { Text("Ürün Kodu") }) }
+            item { OutlinedTextField(fiyat, { fiyat = it }, label = { Text("Fiyat USD") }) }
+            item { OutlinedTextField(ozellikler, { ozellikler = it }, label = { Text("Özellikler") }) }
+
+            item {
                 Button(
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        navController.navigate("add_product_form/$cat")
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Text(cat)
-                }
-            }
-        }
-    }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddProductFormScreen(navController: NavController, category: String) {
 
-    var name by remember { mutableStateOf("") }
-    var price by remember { mutableStateOf("") }
-    var desc by remember { mutableStateOf("") }
+                        val urun = Urun(
+                            kategori = realCategory,
+                            urun_model = model,
+                            marka = marka,
+                            pompa = pompa,
+                            asama = asama,
+                            membran_gpd = membran.toDoubleOrNull(),
+                            tank_galon = tank.toDoubleOrNull(),
+                            urun_kodu = kod.toIntOrNull(),
+                            fiyat_usd = fiyat.toDoubleOrNull(),
+                            ozellikler = ozellikler
+                        )
 
-    val db = FirebaseFirestore.getInstance()
+                        Firebase.firestore
+                            .collection("products")
+                            .add(urun)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ürün Ekle - $category") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, null)
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            BottomAppBar {
-                IconButton(onClick = {
-                    navController.navigate("categories")
-                }) {
-                    Icon(Icons.Default.Home, null)
-                }
-            }
-        }
-    ) { padding ->
-
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-
-            OutlinedTextField(name, { name = it }, label = { Text("Ürün adı") })
-            OutlinedTextField(price, { price = it }, label = { Text("Fiyat") })
-            OutlinedTextField(desc, { desc = it }, label = { Text("Açıklama") })
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-
-                    val product = hashMapOf(
-                        "urun_model" to name,
-                        "fiyat_usd" to price.toDoubleOrNull(),
-                        "ozellikler" to desc,
-                        "kategori" to category
-                    )
-
-                    db.collection("products")
-                        .add(product)
-                        .addOnSuccessListener {
+                        scope.launch {
+                            snackbar.showSnackbar("Ürün eklendi ✅")
+                            delay(1000)
                             navController.popBackStack()
                         }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Kaydet")
+                    }
+                ) {
+                    Text("Kaydet")
+                }
             }
         }
     }
 }
-
-
-
-
-
 
 fun String.toNavArg(): String = Uri.encode(this)
 fun String.fromNavArg(): String = Uri.decode(this)
@@ -1153,3 +1294,15 @@ fun formatDate(time: Long): String {
     return sdf.format(java.util.Date(time))
 }
 
+fun String.normalizeCategory(): String {
+    return this
+        .trim()
+        .lowercase()
+        .replace("ı", "i")
+        .replace("ş", "s")
+        .replace("ç", "c")
+        .replace("ğ", "g")
+        .replace("ü", "u")
+        .replace("ö", "o")
+        .replaceFirstChar { it.uppercase() }
+}
