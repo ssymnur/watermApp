@@ -109,13 +109,16 @@ data class Customer(
 data class OrderItem(
     val model: String = "",
     val quantity: Int = 0,
-    val price: Double = 0.0
+    val price: Double = 0.0,
+    val currency: String = "USD"
 )
 
 data class Order(
     val customer: Customer = Customer(),
     val items: List<OrderItem> = emptyList(),
-    val total: Double = 0.0,
+    val baseTotals: Map<String, Double> = emptyMap(),      // iskonto öncesi
+    val discountedTotals: Map<String, Double> = emptyMap(), // iskonto sonrası
+    val discountPercent: Double = 0.0,                      // % iskonto
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -126,6 +129,32 @@ data class CartItem(
 object CartManager {
 
     var cart = mutableStateListOf<CartItem>()
+
+    var appliedDiscountPercent by mutableStateOf(0.0)
+
+    fun applyDiscount(percent: Double) {
+        appliedDiscountPercent = percent
+    }
+
+    var discountPercent by mutableStateOf(0.0)
+
+    fun totalsByCurrency(): Map<String, Double> {
+        return cart
+            .groupBy { it.urun.paraBirimi }
+            .mapValues { entry ->
+                entry.value.sumOf {
+                    (it.urun.fiyat_usd ?: 0.0) * it.quantity.value
+                }
+            }
+    }
+
+    fun totalsWithDiscount(): Map<String, Double> {
+        val base = totalsByCurrency()
+
+        return base.mapValues { (_, total) ->
+            total * (1 - appliedDiscountPercent / 100)
+        }
+    }
 
     fun add(urun: Urun) {
         val existing = cart.find { it.urun.urun_model == urun.urun_model }
@@ -646,9 +675,13 @@ fun CategoryButton(
 fun CartScreen(navController: NavHostController) {
 
     val cart = CartManager.cart
-    val total = CartManager.totalPrice()
+    val totals = CartManager.totalsWithDiscount()
+    val baseTotals = CartManager.totalsByCurrency()
+
     val context = LocalContext.current
     val view = LocalView.current
+
+    var discountText by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -661,14 +694,12 @@ fun CartScreen(navController: NavHostController) {
                 },
                 actions = {
 
-                    // ✅ PRINT BUTONU
                     IconButton(onClick = {
                         printView(context, view)
                     }) {
                         Icon(Icons.Default.Print, contentDescription = "Yazdır")
                     }
 
-                    // ✅ MÜŞTERİ KAYDET BUTONU
                     IconButton(onClick = {
                         navController.navigate("customerForm")
                     }) {
@@ -686,6 +717,7 @@ fun CartScreen(navController: NavHostController) {
                 .padding(16.dp)
         ) {
 
+            // ✅ SEPET LİSTESİ
             LazyColumn(modifier = Modifier.weight(1f)) {
 
                 items(cart) { item ->
@@ -715,16 +747,66 @@ fun CartScreen(navController: NavHostController) {
                 }
             }
 
-            Text(
-                text = "Toplam: $total USD",
-                style = MaterialTheme.typography.headlineSmall
-            )
+            Spacer(Modifier.height(12.dp))
+
+            // ✅ İSKONTO ALANI
+            Row(verticalAlignment = Alignment.CenterVertically) {
+
+                OutlinedTextField(
+                    value = discountText,
+                    onValueChange = { discountText = it },
+                    label = { Text("% İskonto") },
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(Modifier.width(10.dp))
+
+                Button(onClick = {
+                    val percent = discountText.toDoubleOrNull() ?: 0.0
+                    CartManager.applyDiscount(percent)
+                }) {
+                    Text("Uygula")
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ✅ TOPLAMLAR
+            baseTotals.forEach { (currency, baseTotal) ->
+
+                val discounted = totals[currency] ?: baseTotal
+
+                Column {
+
+                    // 👉 indirimsiz (silik)
+                    if (CartManager.appliedDiscountPercent > 0){
+                        Text(
+                            text = when (currency) {
+                                "USD" -> "USD: %.2f $".format(baseTotal)
+                                "EUR" -> "EUR: %.2f €".format(baseTotal)
+                                "TL" -> "TL: %.2f ₺".format(baseTotal)
+                                else -> "$currency: $baseTotal"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.Gray
+                        )
+                    }
+
+                    // 👉 indirimli (ana fiyat)
+                    Text(
+                        text = when (currency) {
+                            "USD" -> "Toplam: %.2f $".format(discounted)
+                            "EUR" -> "Toplam: %.2f €".format(discounted)
+                            "TL" -> "Toplam: %.2f ₺".format(discounted)
+                            else -> "$currency: $discounted"
+                        },
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                }
+            }
         }
     }
 }
-
-
-
 
 @Composable
 fun SimplePage(title: String) {
@@ -911,15 +993,21 @@ fun CustomerFormScreen(navController: NavHostController) {
                             OrderItem(
                                 model = it.urun.urun_model,
                                 quantity = it.quantity.value,
-                                price = it.urun.fiyat_usd ?: 0.0
+                                price = it.urun.fiyat_usd ?: 0.0,
+                                currency = it.urun.paraBirimi
                             )
                         }
 
                         // ✅ sipariş oluştur
+                        val baseTotals = CartManager.totalsByCurrency()
+                        val discountedTotals = CartManager.totalsWithDiscount()
+
                         val order = Order(
                             customer = customer,
                             items = items,
-                            total = CartManager.totalPrice()
+                            baseTotals = baseTotals,
+                            discountedTotals = discountedTotals,
+                            discountPercent = CartManager.appliedDiscountPercent
                         )
 
                         // ✅ firebase kaydet
@@ -998,7 +1086,6 @@ fun CustomerFormScreen(navController: NavHostController) {
         }
     }
 }
-
 
 fun saveOrderToFirebase(order: Order) {
     val db = Firebase.firestore
@@ -1134,7 +1221,36 @@ fun OrdersScreen(navController: NavHostController) {
                                 Text("- ${it.model} x${it.quantity}")
                             }
 
-                            Text("Toplam: ${order.total} USD")
+                            Text("İskonto: %${order.discountPercent}")
+
+                            order.baseTotals.forEach { (currency, base) ->
+
+                                val discounted = order.discountedTotals[currency] ?: base
+                                val diff = base - discounted
+
+                                Column {
+
+                                    // normal fiyat
+                                    Text(
+                                        "$currency Normal: %.2f".format(base),
+                                        color = Color.Gray
+                                    )
+
+                                    // indirimli fiyat
+                                    Text(
+                                        "$currency İndirimli: %.2f".format(discounted),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+
+                                    // iskonto miktarı
+                                    if (diff > 0) {
+                                        Text(
+                                            "$currency İskonto: %.2f".format(diff),
+                                            color = Color(0xFF2E7D32) // yeşil
+                                        )
+                                    }
+                                }
+                            }
 
                             Spacer(Modifier.height(8.dp))
 
@@ -1409,7 +1525,6 @@ fun AddProductFormScreen(
         }
     }
 }
-
 @Composable
 fun EditOrderScreen(orderId: String, navController: NavHostController) {
 
@@ -1424,43 +1539,82 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
             }
     }
 
-    if (order == null) {
-        CircularProgressIndicator()
+    val currentOrder = order
+
+    if (currentOrder == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
         return
     }
 
-    var name by remember { mutableStateOf(order!!.customer.customerName) }
+    var name by remember { mutableStateOf(currentOrder.customer.customerName) }
 
-    Column(Modifier.padding(16.dp)) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
 
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Müşteri Adı") }
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        Button(onClick = {
-
-            val updated = order!!.copy(
-                customer = order!!.customer.copy(
-                    customerName = name
-                )
+        item {
+            Text(
+                "İskonto: %${currentOrder.discountPercent}",
+                style = MaterialTheme.typography.titleMedium
             )
+        }
 
-            Firebase.firestore.collection("orders")
-                .document(orderId)
-                .set(updated)
+        items(currentOrder.baseTotals.toList()) { (currency, base) ->
 
-            navController.popBackStack()
+            val discounted = currentOrder.discountedTotals[currency] ?: base
+            val diff = base - discounted
 
-        }) {
-            Text("Kaydet")
+            Column {
+                Text(
+                    "$currency Normal: %.2f".format(base),
+                    color = Color.Gray
+                )
+                Text("$currency İndirimli: %.2f".format(discounted))
+                Text("$currency İskonto: %.2f".format(diff))
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(12.dp))
+        }
+
+        item {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Müşteri Adı") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+
+                    val updated = currentOrder.copy(
+                        customer = currentOrder.customer.copy(
+                            customerName = name
+                        )
+                    )
+
+                    Firebase.firestore.collection("orders")
+                        .document(orderId)
+                        .set(updated)
+
+                    navController.popBackStack()
+                }
+            ) {
+                Text("Kaydet")
+            }
         }
     }
 }
-
 
 fun String.toNavArg(): String = Uri.encode(this)
 fun String.fromNavArg(): String = Uri.decode(this)
