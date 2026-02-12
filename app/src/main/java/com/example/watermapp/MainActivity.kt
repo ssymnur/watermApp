@@ -127,6 +127,8 @@ data class CartItem(
     var quantity: MutableState<Int> = mutableStateOf(1)
 )
 object CartManager {
+    var usdRate by mutableStateOf(32.0)
+    var eurRate by mutableStateOf(35.0)
 
     var cart = mutableStateListOf<CartItem>()
 
@@ -154,6 +156,25 @@ object CartManager {
         return base.mapValues { (_, total) ->
             total * (1 - appliedDiscountPercent / 100)
         }
+    }
+
+    fun totalInTL(): Double {
+
+        val rawTotal = cart.sumOf { item ->
+
+            val price = item.urun.fiyat_usd ?: 0.0
+            val qty = item.quantity.value
+
+            when (item.urun.paraBirimi) {
+                "USD" -> price * usdRate * qty
+                "EUR" -> price * eurRate * qty
+                "TL" -> price * qty
+                else -> 0.0
+            }
+        }
+
+        // iskonto uygula
+        return rawTotal * (1 - appliedDiscountPercent / 100)
     }
 
     fun add(urun: Urun) {
@@ -681,6 +702,9 @@ fun CartScreen(navController: NavHostController) {
     val context = LocalContext.current
     val view = LocalView.current
 
+    var usdText by remember { mutableStateOf(CartManager.usdRate.toString()) }
+    var eurText by remember { mutableStateOf(CartManager.eurRate.toString()) }
+
     var discountText by remember { mutableStateOf("") }
 
     Scaffold(
@@ -716,6 +740,35 @@ fun CartScreen(navController: NavHostController) {
                 .padding(padding)
                 .padding(16.dp)
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+
+                OutlinedTextField(
+                    value = usdText,
+                    onValueChange = {
+                        usdText = it
+                        CartManager.usdRate = it.toDoubleOrNull() ?: 0.0
+                    },
+                    label = { Text("USD Kuru") },
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                OutlinedTextField(
+                    value = eurText,
+                    onValueChange = {
+                        eurText = it
+                        CartManager.eurRate = it.toDoubleOrNull() ?: 0.0
+                    },
+                    label = { Text("EUR Kuru") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Text(
+                text = "Genel Toplam: %.2f ₺".format(CartManager.totalInTL()),
+                style = MaterialTheme.typography.headlineMedium
+            )
 
             // ✅ SEPET LİSTESİ
             LazyColumn(modifier = Modifier.weight(1f)) {
