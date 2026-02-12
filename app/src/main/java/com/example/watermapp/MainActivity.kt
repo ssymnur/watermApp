@@ -1,5 +1,6 @@
 package com.example.watermapp
 
+import android.R.attr.category
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -25,8 +26,13 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import android.net.Uri
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalView
@@ -35,6 +41,8 @@ import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.FirebaseFirestore
@@ -46,13 +54,11 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("app", Context.MODE_PRIVATE)
 
-        if (!prefs.getBoolean("seed_done", false)) {
-            SeedUploader.uploadFromJson(this)
-            prefs.edit().putBoolean("seed_done", true).apply()
-        }
+
+            //SeedUploader.uploadFromJson(this) //KALDIR firestorden veri çekiyor
+
 
         setContent {
-
             val context = LocalContext.current
 
             CartManager.SessionManager.isStaff =
@@ -68,6 +74,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+
 
 //sharedpreferences
 object LoginPrefs {
@@ -192,9 +200,19 @@ fun AppNavigator(startDestination: String) {
 
 
         }
-        composable("add_product/{mainCategory}") { backStackEntry ->
-            val mainCategory = backStackEntry.arguments?.getString("mainCategory") ?: ""
-            AddProductCategoryScreen(navController, mainCategory)
+
+        composable(
+            "add_product_form/{ana}/{alt}",
+            arguments = listOf(
+                navArgument("ana") { type = NavType.StringType },
+                navArgument("alt") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val ana = backStackEntry.arguments?.getString("ana")?.fromNavArg() ?: ""
+            val alt = backStackEntry.arguments?.getString("alt")?.fromNavArg() ?: ""
+
+            AddProductFormScreen(navController, ana, alt)
         }
 
         composable("categories") {
@@ -203,10 +221,9 @@ fun AppNavigator(startDestination: String) {
             }
         }
 
-
-        composable("add_product_form/{category}") { backStackEntry ->
-            val category = backStackEntry.arguments?.getString("category") ?: ""
-            AddProductFormScreen(navController, category)
+        composable("editOrder/{orderId}") { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("orderId") ?: ""
+            EditOrderScreen(id, navController)
         }
 
         composable("orders") {
@@ -317,36 +334,73 @@ fun LoginScreen(navController: NavHostController) {
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(navController: NavHostController) {
 
+    val categories = listOf(
+        Triple("Evsel", "evsel", Icons.Default.Home),
+        Triple("Endüstriyel", "endustriyel", Icons.Default.Build),
+        Triple("Kimyasal", "kimyasal", Icons.Default.Science),
+        Triple("Peyzaj", "peyzaj", Icons.Default.Park)
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center
+            .padding(16.dp)
     ) {
 
-        Text("Kategoriler", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Kategoriler",
+            style = MaterialTheme.typography.headlineMedium
+        )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
 
-        CategoryButton("Evsel", "evsel", navController)
-        CategoryButton("Endüstriyel", "endustriyel", navController)
-        CategoryButton("Kimyasal", "kimyasal", navController)
-        CategoryButton("Peyzaj", "peyzaj", navController)
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
 
-        // ✅ SADECE PERSONEL GÖRÜR
-        if (CartManager.SessionManager.isStaff) {
-            Spacer(Modifier.height(20.dp))
+            items(categories) { (title, route, icon) ->
 
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { navController.navigate("orders") }
-            ) {
-                Text("Müşteri Kayıtları")
+                Card(
+                    onClick = { navController.navigate(route) },
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFF8C00)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Icon(
+                            icon,
+                            contentDescription = title,
+                            modifier = Modifier.size(40.dp),
+                            tint = Color.White
+                        )
+
+                        Spacer(Modifier.height(10.dp))
+
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White
+                        )
+                    }
+                }
             }
         }
     }
@@ -357,14 +411,28 @@ fun EvselScreen(navController: NavHostController) {
 
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    LaunchedEffect(Unit) {
-        ProductRepository.getProducts { products ->
-            kategoriler = products
-                .map { it.kategori }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .sorted()
-        }
+    DisposableEffect(Unit) {
+
+        val listener = FirebaseFirestore.getInstance()
+            .collection("products")
+            .addSnapshotListener { snapshot, _ ->
+
+                kategoriler = snapshot?.documents
+                    ?.mapNotNull { doc ->
+
+                        val ana = doc.getString("anaKategori")
+                            ?: doc.getString("kategori") // eski alan
+
+                        if (ana == "Evsel")
+                            doc.getString("altKategori")
+                        else null
+                    }
+                    ?.distinct()
+                    ?.sorted()
+                    ?: emptyList()
+            }
+
+        onDispose { listener.remove() }
     }
 
     AppScaffold("Evsel Ürün Kategorileri", navController) { padding ->
@@ -381,9 +449,6 @@ fun EvselScreen(navController: NavHostController) {
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     elevation = CardDefaults.cardElevation(6.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
@@ -403,15 +468,12 @@ fun EvselScreen(navController: NavHostController) {
         }
     }
 }
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EvselDetailScreen(
     kategoriAdi: String,
     navController: NavHostController
 ) {
-
     var urunler by remember { mutableStateOf<List<Urun>>(emptyList()) }
 
     // 🔥 FIREBASE CANLI LİSTE
@@ -419,7 +481,8 @@ fun EvselDetailScreen(
 
         val listener = FirebaseFirestore.getInstance()
             .collection("products")
-            .whereEqualTo("kategori", kategoriAdi)
+            .whereEqualTo("anaKategori", "Evsel")
+            .whereEqualTo("altKategori", kategoriAdi)
             .addSnapshotListener { snapshot, _ ->
                 urunler = snapshot?.documents?.map { doc ->
                     doc.toObject(Urun::class.java)!!.copy(id = doc.id)
@@ -431,8 +494,6 @@ fun EvselDetailScreen(
         }
     }
 
-
-
     Scaffold(
 
         topBar = {
@@ -442,11 +503,24 @@ fun EvselDetailScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
                     }
+                },
+                actions = {
+
+                    // ✅ SADECE PERSONEL GÖRSÜN
+                    if (CartManager.SessionManager.isStaff) {
+                        IconButton(onClick = {
+                            navController.navigate(
+                                "add_product_form/${"Evsel".toNavArg()}/${kategoriAdi.toNavArg()}"
+                            )
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
+                        }
+                    }
                 }
             )
         },
 
-        bottomBar = {
+                bottomBar = {
             BottomAppBar {
                 IconButton(
                     onClick = { navController.navigate("cart") },
@@ -487,7 +561,7 @@ fun EvselDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
 
                             Text(urun.urun_model, style = MaterialTheme.typography.titleMedium)
-                            Text("Fiyat: ${urun.fiyat_usd ?: "-"} USD")
+                            Text("Fiyat: ${urun.fiyat_usd ?: "-"} ${urun.paraBirimi}")
                             urun.marka?.let { Text("Marka: $it") }
                             urun.pompa?.let { Text("Pompa: $it") }
                             urun.asama?.let { Text("Aşama: $it") }
@@ -660,7 +734,9 @@ fun SimplePage(title: String) {
     ) {
         Text(title, style = MaterialTheme.typography.headlineMedium)
     }
-}@OptIn(ExperimentalMaterial3Api::class)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProductScreen(
     urun: Urun,
@@ -721,7 +797,6 @@ fun EditProductScreen(
                     onClick = {
 
                         val updated = urun.copy(
-                            kategori = urun.kategori,
                             urun_model = model,
                             marka = marka,
                             pompa = pompa,
@@ -937,8 +1012,10 @@ fun saveOrderToFirebase(order: Order) {
             println("Hata: ${it.message}")
         }
 }
-
-//müşteri liste ekranı
+data class OrderDoc(
+    val id: String,
+    val order: Order
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -949,24 +1026,59 @@ fun OrdersScreen(navController: NavHostController) {
         return
     }
 
-    var orders by remember { mutableStateOf<List<Order>>(emptyList()) }
     var search by remember { mutableStateOf("") }
+    var orders by remember { mutableStateOf<List<OrderDoc>>(emptyList()) }
+
+    // 👉 silme için dialog state
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var orderToDelete by remember { mutableStateOf<OrderDoc?>(null) }
 
     DisposableEffect(Unit) {
         val listener = Firebase.firestore.collection("orders")
             .addSnapshotListener { snapshot, _ ->
-                orders = snapshot?.documents?.mapNotNull {
-                    it.toObject(Order::class.java)
+                orders = snapshot?.documents?.mapNotNull { doc ->
+                    doc.toObject(Order::class.java)?.let {
+                        OrderDoc(doc.id, it)
+                    }
                 } ?: emptyList()
             }
 
         onDispose { listener.remove() }
     }
 
-    // 🔍 filtrelenmiş liste
     val filtered = orders.filter {
-        it.customer.customerName.contains(search, true) ||
-                it.customer.companyName.contains(search, true)
+        it.order.customer.customerName.contains(search, true) ||
+                it.order.customer.companyName.contains(search, true)
+    }
+
+    // ✅ SİLME ONAY DİYALOĞU
+    if (showDeleteDialog && orderToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Silme Onayı") },
+            text = { Text("Bu siparişi silmek istediğine emin misin?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    Firebase.firestore
+                        .collection("orders")
+                        .document(orderToDelete!!.id)
+                        .delete()
+
+                    showDeleteDialog = false
+                    orderToDelete = null
+                }) {
+                    Text("Evet, Sil")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    orderToDelete = null
+                }) {
+                    Text("Vazgeç")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -989,7 +1101,6 @@ fun OrdersScreen(navController: NavHostController) {
                 .padding(16.dp)
         ) {
 
-            // 🔍 ARAMA KUTUSU
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
@@ -1000,8 +1111,10 @@ fun OrdersScreen(navController: NavHostController) {
             Spacer(Modifier.height(10.dp))
 
             LazyColumn {
+                items(filtered) { orderDoc ->
 
-                items(filtered) { order ->
+                    val order = orderDoc.order
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1022,6 +1135,18 @@ fun OrdersScreen(navController: NavHostController) {
                             }
 
                             Text("Toplam: ${order.total} USD")
+
+                            Spacer(Modifier.height(8.dp))
+
+                            // ✅ SİL BUTONU
+                            Button(
+                                onClick = {
+                                    orderToDelete = orderDoc
+                                    showDeleteDialog = true
+                                }
+                            ) {
+                                Text("Sil")
+                            }
                         }
                     }
                 }
@@ -1029,6 +1154,8 @@ fun OrdersScreen(navController: NavHostController) {
         }
     }
 }
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1050,10 +1177,11 @@ fun AppScaffold(
                 },
 
                 actions = {
-                    IconButton(onClick = {
-                        navController.navigate("add_product/evsel")
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
+                    if (CartManager.SessionManager.isStaff) {
+                        IconButton(onClick = {
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
+                        }
                     }
                 }
             )
@@ -1078,61 +1206,6 @@ fun AppScaffold(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddProductCategoryScreen(
-    navController: NavHostController,
-    mainCategory: String
-) {
-
-    val realCategory = mainCategory.fromNavArg()
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Kategori Seç") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, null)
-                    }
-                }
-            )
-        }
-    ) { padding ->
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-
-            Text(
-                text = "Ürün eklenecek kategori:",
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Text(
-                text = realCategory,
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    navController.navigate(
-                        "add_product_form/${realCategory.toNavArg()}"
-                    )
-                }
-            ) {
-                Text("Bu kategoriye ürün ekle")
-            }
-        }
-    }
-}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainLayout(
@@ -1193,15 +1266,13 @@ fun MainLayout(
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProductFormScreen(
     navController: NavHostController,
-    category: String
+    anaKategori: String,
+    altKategori: String
 ) {
-
-    val realCategory = category.fromNavArg()
 
     var model by rememberSaveable { mutableStateOf("") }
     var marka by rememberSaveable { mutableStateOf("") }
@@ -1212,6 +1283,9 @@ fun AddProductFormScreen(
     var kod by rememberSaveable { mutableStateOf("") }
     var fiyat by rememberSaveable { mutableStateOf("") }
     var ozellikler by rememberSaveable { mutableStateOf("") }
+
+    var paraBirimi by rememberSaveable { mutableStateOf("USD") }
+    var expanded by remember { mutableStateOf(false) }
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -1238,16 +1312,64 @@ fun AddProductFormScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
-            item { Text("Kategori: $realCategory") }
+            item {
+                Text("Kategori: $anaKategori / $altKategori")
+            }
 
             item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
             item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
             item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
             item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
-            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran GPD") }) }
-            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank Galon") }) }
-            item { OutlinedTextField(kod, { kod = it }, label = { Text("Ürün Kodu") }) }
-            item { OutlinedTextField(fiyat, { fiyat = it }, label = { Text("Fiyat USD") }) }
+            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran") }) }
+            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank") }) }
+            item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
+
+            // ✅ Fiyat
+            item {
+                OutlinedTextField(
+                    fiyat,
+                    { fiyat = it },
+                    label = { Text("Fiyat") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // ✅ PARA BİRİMİ DROPDOWN
+            item {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = paraBirimi,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Para Birimi") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        listOf("USD", "EUR", "TL").forEach { currency ->
+                            DropdownMenuItem(
+                                text = { Text(currency) },
+                                onClick = {
+                                    paraBirimi = currency
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             item { OutlinedTextField(ozellikler, { ozellikler = it }, label = { Text("Özellikler") }) }
 
             item {
@@ -1256,7 +1378,8 @@ fun AddProductFormScreen(
                     onClick = {
 
                         val urun = Urun(
-                            kategori = realCategory,
+                            anaKategori = anaKategori,
+                            altKategori = altKategori,
                             urun_model = model,
                             marka = marka,
                             pompa = pompa,
@@ -1265,6 +1388,7 @@ fun AddProductFormScreen(
                             tank_galon = tank.toDoubleOrNull(),
                             urun_kodu = kod.toIntOrNull(),
                             fiyat_usd = fiyat.toDoubleOrNull(),
+                            paraBirimi = paraBirimi,
                             ozellikler = ozellikler
                         )
 
@@ -1285,6 +1409,58 @@ fun AddProductFormScreen(
         }
     }
 }
+
+@Composable
+fun EditOrderScreen(orderId: String, navController: NavHostController) {
+
+    var order by remember { mutableStateOf<Order?>(null) }
+
+    LaunchedEffect(orderId) {
+        Firebase.firestore.collection("orders")
+            .document(orderId)
+            .get()
+            .addOnSuccessListener {
+                order = it.toObject(Order::class.java)
+            }
+    }
+
+    if (order == null) {
+        CircularProgressIndicator()
+        return
+    }
+
+    var name by remember { mutableStateOf(order!!.customer.customerName) }
+
+    Column(Modifier.padding(16.dp)) {
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Müşteri Adı") }
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        Button(onClick = {
+
+            val updated = order!!.copy(
+                customer = order!!.customer.copy(
+                    customerName = name
+                )
+            )
+
+            Firebase.firestore.collection("orders")
+                .document(orderId)
+                .set(updated)
+
+            navController.popBackStack()
+
+        }) {
+            Text("Kaydet")
+        }
+    }
+}
+
 
 fun String.toNavArg(): String = Uri.encode(this)
 fun String.fromNavArg(): String = Uri.decode(this)

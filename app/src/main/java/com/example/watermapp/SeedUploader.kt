@@ -3,21 +3,22 @@ package com.example.watermapp
 import android.content.Context
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
-
 object SeedUploader {
 
     private val db = Firebase.firestore
 
     fun uploadFromJson(context: Context) {
 
-        val data = loadEvselData(context) // senin mevcut JSON loader
+        val data = loadEvselData(context)
 
         data.kategoriler.forEach { kategori ->
 
             kategori.urunler.forEach { urun ->
 
                 val map = hashMapOf(
-                    "kategori" to kategori.kategoriAdi.normalizeCategory(),
+                    "anaKategori" to "Evsel", // 🔥 EKLEDİK
+                    "altKategori" to kategori.kategoriAdi, // 🔥 EKLEDİK
+
                     "urun_model" to urun.urun_model,
                     "marka" to urun.marka,
                     "pompa" to urun.pompa,
@@ -29,12 +30,11 @@ object SeedUploader {
                     "ozellikler" to urun.ozellikler
                 )
 
-
                 db.collection("products")
                     .document(urun.urun_kodu.toString())
                     .set(map)
-
             }
         }
     }
 }
+

@@ -11,7 +11,9 @@ data class Kategori(
 
 data class Urun(
     val id: String = "",
-    val kategori: String = "",
+    val anaKategori: String = "",
+    val altKategori: String = "",
+    //val kategori: String = "",
     val urun_model: String = "",
     val marka: String? = "",
     val pompa: String? = "",
@@ -20,6 +22,7 @@ data class Urun(
     val tank_galon: Double? = 0.0,
     val urun_kodu: Int? = 0,
     val fiyat_usd: Double? = 0.0,
+    val paraBirimi: String = "USD",
     val ozellikler: String? = ""
 )
 
