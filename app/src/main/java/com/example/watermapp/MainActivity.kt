@@ -159,7 +159,6 @@ object CartManager {
     }
 
     fun totalInTL(): Double {
-
         val rawTotal = cart.sumOf { item ->
 
             val price = item.urun.fiyat_usd ?: 0.0
@@ -173,9 +172,9 @@ object CartManager {
             }
         }
 
-        // iskonto uygula
         return rawTotal * (1 - appliedDiscountPercent / 100)
     }
+
 
     fun add(urun: Urun) {
         val existing = cart.find { it.urun.urun_model == urun.urun_model }
@@ -705,6 +704,7 @@ fun CartScreen(navController: NavHostController) {
     var usdText by remember { mutableStateOf(CartManager.usdRate.toString()) }
     var eurText by remember { mutableStateOf(CartManager.eurRate.toString()) }
 
+
     var discountText by remember { mutableStateOf("") }
 
     Scaffold(
@@ -735,40 +735,35 @@ fun CartScreen(navController: NavHostController) {
     ) { padding ->
 
         Column(
+
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Güncel Kur Gir", style = MaterialTheme.typography.titleMedium)
 
-                OutlinedTextField(
-                    value = usdText,
-                    onValueChange = {
-                        usdText = it
-                        CartManager.usdRate = it.toDoubleOrNull() ?: 0.0
-                    },
-                    label = { Text("USD Kuru") },
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(Modifier.width(8.dp))
-
-                OutlinedTextField(
-                    value = eurText,
-                    onValueChange = {
-                        eurText = it
-                        CartManager.eurRate = it.toDoubleOrNull() ?: 0.0
-                    },
-                    label = { Text("EUR Kuru") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Text(
-                text = "Genel Toplam: %.2f ₺".format(CartManager.totalInTL()),
-                style = MaterialTheme.typography.headlineMedium
+            OutlinedTextField(
+                value = usdText,
+                onValueChange = {
+                    usdText = it
+                    CartManager.usdRate = it.toDoubleOrNull() ?: 0.0
+                },
+                label = { Text("USD → TL") },
+                modifier = Modifier.fillMaxWidth()
             )
+
+            OutlinedTextField(
+                value = eurText,
+                onValueChange = {
+                    eurText = it
+                    CartManager.eurRate = it.toDoubleOrNull() ?: 0.0
+                },
+                label = { Text("EUR → TL") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(12.dp))
 
             // ✅ SEPET LİSTESİ
             LazyColumn(modifier = Modifier.weight(1f)) {
@@ -857,6 +852,14 @@ fun CartScreen(navController: NavHostController) {
                     )
                 }
             }
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = "Genel Toplam (TL): %.2f ₺".format(CartManager.totalInTL()),
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color(0xFF2E7D32)
+            )
+
         }
     }
 }
@@ -914,6 +917,7 @@ fun EditProductScreen(
                 .padding(padding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
+
         ) {
 
             item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
@@ -1098,6 +1102,13 @@ fun CustomerFormScreen(navController: NavHostController) {
                     onValueChange = { customerName = it },
                     label = { Text("Müşteri Adı") },
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                Text(
+                    text = "Toplam Tutar: %.2f ₺".format(CartManager.totalInTL()),
+                    style = MaterialTheme.typography.headlineSmall
                 )
             }
 
@@ -1344,15 +1355,6 @@ fun AppScaffold(
                         Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
                     }
                 },
-
-                actions = {
-                    if (CartManager.SessionManager.isStaff) {
-                        IconButton(onClick = {
-                        }) {
-                            Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
-                        }
-                    }
-                }
             )
         },
 
