@@ -26,12 +26,14 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -97,13 +99,16 @@ object LoginPrefs {
 }
 
 
-//sepetteki üürnler ve müşteri kayıt formunu firebase kaydet
+//sepetteki ürünler ve müşteri kayıt formunu firebase kaydet
 data class Customer(
     val customerName: String = "",
     val companyName: String = "",
     val phone: String = "",
+    val deviceName: String = "",
     val email: String = "",
-    val staffName: String = ""
+    val staffName: String = "",
+    val note: String = "",
+    val address: String = ""
 )
 
 data class OrderItem(
@@ -118,7 +123,8 @@ data class Order(
     val items: List<OrderItem> = emptyList(),
     val baseTotals: Map<String, Double> = emptyMap(),      // iskonto öncesi
     val discountedTotals: Map<String, Double> = emptyMap(), // iskonto sonrası
-    val discountPercent: Double = 0.0,                      // % iskonto
+    val discountPercent: Double = 0.0, // % iskonto
+    val totalTL: Double = 0.0,
     val timestamp: Long = System.currentTimeMillis()
 )
 
@@ -133,6 +139,10 @@ object CartManager {
     var cart = mutableStateListOf<CartItem>()
 
     var appliedDiscountPercent by mutableStateOf(0.0)
+    //KDV EKLE
+    var kdvEnabled by mutableStateOf(false)
+    var kdvRate = 0.20   // %20
+
 
     fun applyDiscount(percent: Double) {
         appliedDiscountPercent = percent
@@ -154,11 +164,19 @@ object CartManager {
         val base = totalsByCurrency()
 
         return base.mapValues { (_, total) ->
-            total * (1 - appliedDiscountPercent / 100)
+
+            var discounted = total * (1 - appliedDiscountPercent / 100)
+
+            if (kdvEnabled) {
+                discounted *= (1 + kdvRate)
+            }
+
+            discounted
         }
     }
 
     fun totalInTL(): Double {
+
         val rawTotal = cart.sumOf { item ->
 
             val price = item.urun.fiyat_usd ?: 0.0
@@ -172,9 +190,14 @@ object CartManager {
             }
         }
 
-        return rawTotal * (1 - appliedDiscountPercent / 100)
-    }
+        var total = rawTotal * (1 - appliedDiscountPercent / 100)
 
+        if (kdvEnabled) {
+            total *= (1 + kdvRate)
+        }
+
+        return total
+    }
 
     fun add(urun: Urun) {
         val existing = cart.find { it.urun.urun_model == urun.urun_model }
@@ -704,6 +727,9 @@ fun CartScreen(navController: NavHostController) {
     var usdText by remember { mutableStateOf(CartManager.usdRate.toString()) }
     var eurText by remember { mutableStateOf(CartManager.eurRate.toString()) }
 
+    //swipe
+    var itemToDelete by remember { mutableStateOf<CartItem?>(null) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     var discountText by remember { mutableStateOf("") }
 
@@ -769,30 +795,87 @@ fun CartScreen(navController: NavHostController) {
             LazyColumn(modifier = Modifier.weight(1f)) {
 
                 items(cart) { item ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
+
+                    val dismissState = rememberSwipeToDismissBoxState()
+
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue ==
+                            SwipeToDismissBoxValue.StartToEnd
+                        ) {
+                            itemToDelete = item
+                            showDeleteDialog = true
+                            dismissState.reset()
+                        }
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = true,
+                        backgroundContent = {
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.White) // arka plan beyaz
+                                    .padding(20.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Sil",
+                                    tint = Color(0xFFD32F2F) // kırmızı çöp kutusu
+                                )
+                            }
+                        }
                     ) {
-                        Row(
+
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 6.dp)
                         ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
 
-                            Text(
-                                text = item.urun.urun_model,
-                                modifier = Modifier.weight(1f)
-                            )
+                                Text(
+                                    text = item.urun.urun_model,
+                                    modifier = Modifier.weight(1f)
+                                )
 
-                            Text(
-                                text = "Adet: ${item.quantity.value}",
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                                Text(
+                                    text = "Adet: ${item.quantity.value}",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
                         }
                     }
                 }
+            }
+            if (showDeleteDialog && itemToDelete != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Ürünü Sil") },
+                    text = { Text("Bu ürünü sepetten silmek istiyor musun?") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            CartManager.cart.remove(itemToDelete!!)
+                            showDeleteDialog = false
+                        }) {
+                            Text("Evet")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showDeleteDialog = false
+                        }) {
+                            Text("Vazgeç")
+                        }
+                    }
+                )
             }
 
             Spacer(Modifier.height(12.dp))
@@ -808,6 +891,19 @@ fun CartScreen(navController: NavHostController) {
                 )
 
                 Spacer(Modifier.width(10.dp))
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                    Checkbox(
+                        checked = CartManager.kdvEnabled,
+                        onCheckedChange = { CartManager.kdvEnabled = it }
+                    )
+
+                    Text("KDV %20 ekle")
+                }
+
 
                 Button(onClick = {
                     val percent = discountText.toDoubleOrNull() ?: 0.0
@@ -856,8 +952,8 @@ fun CartScreen(navController: NavHostController) {
 
             Text(
                 text = "Genel Toplam (TL): %.2f ₺".format(CartManager.totalInTL()),
-                style = MaterialTheme.typography.headlineMedium,
-                color = Color(0xFF2E7D32)
+                style = MaterialTheme.typography.titleMedium,
+                        color = Color(0xFF2E7D32)
             )
 
         }
@@ -1009,11 +1105,19 @@ fun CustomerFormScreen(navController: NavHostController) {
     var customerName by rememberSaveable { mutableStateOf("") }
     var companyName by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
+    var deviceName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var staffName by rememberSaveable { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
+    var address by rememberSaveable { mutableStateOf("") }
+
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    val totalTL by remember {
+        derivedStateOf { CartManager.totalInTL() }
+    }
 
     Scaffold(
 
@@ -1041,8 +1145,12 @@ fun CustomerFormScreen(navController: NavHostController) {
                             customerName = customerName,
                             companyName = companyName,
                             phone = phone,
+                            deviceName = deviceName,
                             email = email,
-                            staffName = staffName
+                            staffName = staffName,
+                            note = note,
+                            address = address
+
                         )
 
                         // ✅ sepet ürünlerini al
@@ -1064,7 +1172,9 @@ fun CustomerFormScreen(navController: NavHostController) {
                             items = items,
                             baseTotals = baseTotals,
                             discountedTotals = discountedTotals,
-                            discountPercent = CartManager.appliedDiscountPercent
+                            discountPercent = CartManager.appliedDiscountPercent,
+                            totalTL = totalTL
+
                         )
 
                         // ✅ firebase kaydet
@@ -1107,7 +1217,7 @@ fun CustomerFormScreen(navController: NavHostController) {
 
             item {
                 Text(
-                    text = "Toplam Tutar: %.2f ₺".format(CartManager.totalInTL()),
+                    text = "Toplam Tutar: %.2f ₺".format(totalTL),
                     style = MaterialTheme.typography.headlineSmall
                 )
             }
@@ -1132,6 +1242,15 @@ fun CustomerFormScreen(navController: NavHostController) {
 
             item {
                 OutlinedTextField(
+                    value = deviceName,
+                    onValueChange = { deviceName = it },
+                    label = { Text("Cihaz Adı") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Mail Adresi") },
@@ -1147,6 +1266,26 @@ fun CustomerFormScreen(navController: NavHostController) {
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
+            item {
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Adres") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            item {
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text("Not") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+
         }
     }
 }
@@ -1276,7 +1415,10 @@ fun OrdersScreen(navController: NavHostController) {
                             Text("Müşteri: ${order.customer.customerName}")
                             Text("Şirket: ${order.customer.companyName}")
                             Text("Telefon: ${order.customer.phone}")
+                            Text("Cihaz: ${order.customer.deviceName}")
                             Text("Personel: ${order.customer.staffName}")
+                            Text("Adres: ${order.customer.address}")
+                            Text("Not: ${order.customer.note}")
                             Text("Tarih: ${formatDate(order.timestamp)}")
 
                             Spacer(Modifier.height(6.dp))
@@ -1315,6 +1457,14 @@ fun OrdersScreen(navController: NavHostController) {
                                     }
                                 }
                             }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Text(
+                                "Genel Toplam (TL): %.2f ₺".format(order.totalTL),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color(0xFF2E7D32)
+                            )
 
                             Spacer(Modifier.height(8.dp))
 
