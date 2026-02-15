@@ -19,14 +19,14 @@ object SeedUploader {
                     "anaKategori" to "Evsel", // 🔥 EKLEDİK
                     "altKategori" to kategori.kategoriAdi, // 🔥 EKLEDİK
 
-                    "urun_model" to urun.urun_model,
+                    "urun_adi" to urun.urun_adi,
                     "marka" to urun.marka,
                     "pompa" to urun.pompa,
                     "asama" to urun.asama,
                     "membran_gpd" to urun.membran_gpd,
                     "tank_galon" to urun.tank_galon,
                     "urun_kodu" to urun.urun_kodu,
-                    "fiyat_usd" to urun.fiyat_usd,
+                    "fiyat" to urun.fiyat,
                     "ozellikler" to urun.ozellikler
                 )
 
@@ -37,4 +37,3 @@ object SeedUploader {
         }
     }
 }
-

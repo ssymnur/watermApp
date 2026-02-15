@@ -57,7 +57,7 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("app", Context.MODE_PRIVATE)
 
 
-            //SeedUploader.uploadFromJson(this) //KALDIR firestorden veri çekiyor
+        //SeedUploader.uploadFromJson(this) //KALDIR firestorden veri çekiyor
 
 
         setContent {
@@ -76,8 +76,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-
 
 //sharedpreferences
 object LoginPrefs {
@@ -155,7 +153,7 @@ object CartManager {
             .groupBy { it.urun.paraBirimi }
             .mapValues { entry ->
                 entry.value.sumOf {
-                    (it.urun.fiyat_usd ?: 0.0) * it.quantity.value
+                    (it.urun.fiyat ?: 0.0) * it.quantity.value
                 }
             }
     }
@@ -179,7 +177,7 @@ object CartManager {
 
         val rawTotal = cart.sumOf { item ->
 
-            val price = item.urun.fiyat_usd ?: 0.0
+            val price = item.urun.fiyat ?: 0.0
             val qty = item.quantity.value
 
             when (item.urun.paraBirimi) {
@@ -200,7 +198,7 @@ object CartManager {
     }
 
     fun add(urun: Urun) {
-        val existing = cart.find { it.urun.urun_model == urun.urun_model }
+        val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
 
         if (existing != null) {
             existing.quantity.value++
@@ -214,7 +212,7 @@ object CartManager {
     }
 
     fun remove(urun: Urun) {
-        val existing = cart.find { it.urun.urun_model == urun.urun_model }
+        val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
 
         if (existing != null) {
             existing.quantity.value--
@@ -226,13 +224,13 @@ object CartManager {
     }
 
     fun getQuantity(urun: Urun): Int {
-        return cart.find { it.urun.urun_model == urun.urun_model }
+        return cart.find { it.urun.urun_adi == urun.urun_adi }
             ?.quantity?.value ?: 0
     }
 
     fun totalPrice(): Double {
         return cart.sumOf {
-            (it.urun.fiyat_usd ?: 0.0) * it.quantity.value
+            (it.urun.fiyat ?: 0.0) * it.quantity.value
         }
     }
 }
@@ -247,13 +245,13 @@ fun AppNavigator(startDestination: String) {
         startDestination = startDestination
     ) {
 
+        // Ürün düzenleme ekranı
         composable(
             "edit/{productId}",
             arguments = listOf(navArgument("productId") { type = NavType.StringType })
         ) { backStackEntry ->
 
             val productId = backStackEntry.arguments?.getString("productId") ?: ""
-
             var urun by remember { mutableStateOf<Urun?>(null) }
 
             LaunchedEffect(productId) {
@@ -269,10 +267,9 @@ fun AppNavigator(startDestination: String) {
             } else {
                 EditProductScreen(urun!!, productId, navController)
             }
-
-
         }
 
+        // Yeni ürün ekleme formu
         composable(
             "add_product_form/{ana}/{alt}",
             arguments = listOf(
@@ -287,29 +284,38 @@ fun AppNavigator(startDestination: String) {
             AddProductFormScreen(navController, ana, alt)
         }
 
+        // Kategori ekranı
         composable("categories") {
             MainLayout(navController) {
                 CategoryScreen(navController)
             }
         }
 
-        composable("editOrder/{orderId}") { backStackEntry ->
+        // Sipariş düzenleme
+        composable(
+            "editOrder/{orderId}",
+            arguments = listOf(navArgument("orderId") { type = NavType.StringType })
+        ) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("orderId") ?: ""
             EditOrderScreen(id, navController)
         }
 
+        // Siparişler listesi
         composable("orders") {
             OrdersScreen(navController)
         }
 
+        // Sepet ekranı
         composable("cart") {
             CartScreen(navController)
         }
 
+        // Müşteri formu
         composable("customerForm") {
             CustomerFormScreen(navController)
         }
 
+        // Evsel detay ekranı
         composable(
             "evselDetail/{kategoriAdi}",
             arguments = listOf(navArgument("kategoriAdi") { type = NavType.StringType })
@@ -318,24 +324,24 @@ fun AppNavigator(startDestination: String) {
             val kategoriAdi =
                 backStackEntry.arguments?.getString("kategoriAdi")?.fromNavArg() ?: ""
 
-            EvselDetailScreen(kategoriAdi, navController)
+            DetailScreenProducts(kategoriAdi, navController)
         }
-
+        // AppNavigator içinde
+        composable("evsel") {
+            DetailScreenCategory(navController) // evsel kategorisi için detay ekranı
+        }
+        // Login ekranı
         composable("login") {
             LoginScreen(navController)
         }
 
-        composable("evsel") {
-            EvselScreen(navController)
-        }
-
-
-        //composable("evsel") { SimplePage("Evsel Ürünler") }
+        // Diğer kategori sayfaları
         composable("endustriyel") { SimplePage("Endüstriyel Ürünler") }
         composable("kimyasal") { SimplePage("Kimyasal Ürünler") }
         composable("peyzaj") { SimplePage("Peyzaj Ürünleri") }
     }
 }
+
 @Composable
 fun LoginScreen(navController: NavHostController) {
     val context = LocalContext.current
@@ -479,7 +485,7 @@ fun CategoryScreen(navController: NavHostController) {
 }
 
 @Composable
-fun EvselScreen(navController: NavHostController) {
+fun DetailScreenCategory(navController: NavHostController) {
 
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
@@ -542,7 +548,7 @@ fun EvselScreen(navController: NavHostController) {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EvselDetailScreen(
+fun DetailScreenProducts(
     kategoriAdi: String,
     navController: NavHostController
 ) {
@@ -592,7 +598,7 @@ fun EvselDetailScreen(
             )
         },
 
-                bottomBar = {
+        bottomBar = {
             BottomAppBar {
                 IconButton(
                     onClick = { navController.navigate("cart") },
@@ -632,13 +638,15 @@ fun EvselDetailScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
 
-                            Text(urun.urun_model, style = MaterialTheme.typography.titleMedium)
-                            Text("Fiyat: ${urun.fiyat_usd ?: "-"} ${urun.paraBirimi}")
+                            Text(urun.urun_adi, style = MaterialTheme.typography.titleMedium)
+                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi}")
                             urun.marka?.let { Text("Marka: $it") }
+                            urun.urun_kodu?.let { Text("Kod: $it") }
                             urun.pompa?.let { Text("Pompa: $it") }
                             urun.asama?.let { Text("Aşama: $it") }
                             urun.membran_gpd?.let { Text("Membran: $it GPD") }
                             urun.tank_galon?.let { Text("Tank: $it Galon") }
+
 
 
                             TextButton(onClick = { expanded = !expanded }) {
@@ -713,6 +721,7 @@ fun CategoryButton(
         Text(title)
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(navController: NavHostController) {
@@ -842,7 +851,7 @@ fun CartScreen(navController: NavHostController) {
                             ) {
 
                                 Text(
-                                    text = item.urun.urun_model,
+                                    text = item.urun.urun_adi,
                                     modifier = Modifier.weight(1f)
                                 )
 
@@ -953,7 +962,7 @@ fun CartScreen(navController: NavHostController) {
             Text(
                 text = "Genel Toplam (TL): %.2f ₺".format(CartManager.totalInTL()),
                 style = MaterialTheme.typography.titleMedium,
-                        color = Color(0xFF2E7D32)
+                color = Color(0xFF2E7D32)
             )
 
         }
@@ -978,14 +987,14 @@ fun EditProductScreen(
     navController: NavHostController
 ) {
 
-    var model by rememberSaveable { mutableStateOf(urun.urun_model) }
+    var model by rememberSaveable { mutableStateOf(urun.urun_adi) }
     var marka by rememberSaveable { mutableStateOf(urun.marka ?: "") }
     var pompa by rememberSaveable { mutableStateOf(urun.pompa ?: "") }
     var asama by rememberSaveable { mutableStateOf(urun.asama ?: "") }
     var membran by rememberSaveable { mutableStateOf(urun.membran_gpd?.toString() ?: "") }
     var tank by rememberSaveable { mutableStateOf(urun.tank_galon?.toString() ?: "") }
     var kod by rememberSaveable { mutableStateOf(urun.urun_kodu?.toString() ?: "") }
-    var fiyat by rememberSaveable { mutableStateOf(urun.fiyat_usd?.toString() ?: "") }
+    var fiyat by rememberSaveable { mutableStateOf(urun.fiyat?.toString() ?: "") }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -1032,14 +1041,14 @@ fun EditProductScreen(
                     onClick = {
 
                         val updated = urun.copy(
-                            urun_model = model,
+                            urun_adi = model,
                             marka = marka,
                             pompa = pompa,
                             asama = asama,
                             membran_gpd = membran.toDoubleOrNull(),
                             tank_galon = tank.toDoubleOrNull(),
                             urun_kodu = kod.toIntOrNull(),
-                            fiyat_usd = fiyat.toDoubleOrNull()
+                            fiyat = fiyat.toDoubleOrNull()
                         )
 
                         ProductRepository.updateProduct(productId, updated)
@@ -1156,9 +1165,9 @@ fun CustomerFormScreen(navController: NavHostController) {
                         // ✅ sepet ürünlerini al
                         val items = CartManager.cart.map {
                             OrderItem(
-                                model = it.urun.urun_model,
+                                model = it.urun.urun_adi,
                                 quantity = it.quantity.value,
-                                price = it.urun.fiyat_usd ?: 0.0,
+                                price = it.urun.fiyat ?: 0.0,
                                 currency = it.urun.paraBirimi
                             )
                         }
@@ -1291,17 +1300,18 @@ fun CustomerFormScreen(navController: NavHostController) {
 }
 
 fun saveOrderToFirebase(order: Order) {
-    val db = Firebase.firestore
+    val db = FirebaseFirestore.getInstance()
 
     db.collection("orders")
         .add(order)
-        .addOnSuccessListener {
-            println("Sipariş kaydedildi")
+        .addOnSuccessListener { docRef ->
+            println("Sipariş başarıyla kaydedildi: ${docRef.id}")
         }
-        .addOnFailureListener {
-            println("Hata: ${it.message}")
+        .addOnFailureListener { e ->
+            println("Sipariş kaydedilemedi: $e")
         }
 }
+
 data class OrderDoc(
     val id: String,
     val order: Order
@@ -1701,14 +1711,14 @@ fun AddProductFormScreen(
                         val urun = Urun(
                             anaKategori = anaKategori,
                             altKategori = altKategori,
-                            urun_model = model,
+                            urun_adi = model,
                             marka = marka,
                             pompa = pompa,
                             asama = asama,
                             membran_gpd = membran.toDoubleOrNull(),
                             tank_galon = tank.toDoubleOrNull(),
                             urun_kodu = kod.toIntOrNull(),
-                            fiyat_usd = fiyat.toDoubleOrNull(),
+                            fiyat = fiyat.toDoubleOrNull(),
                             paraBirimi = paraBirimi,
                             ozellikler = ozellikler
                         )
