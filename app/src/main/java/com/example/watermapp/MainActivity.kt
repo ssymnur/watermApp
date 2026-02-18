@@ -56,9 +56,10 @@ class MainActivity : ComponentActivity() {
 
         val prefs = getSharedPreferences("app", Context.MODE_PRIVATE)
 
-
-        //SeedUploader.uploadFromJson(this) //KALDIR firestorden veri çekiyor
-
+        //SeedUploader.uploadFromJson(this, "Evsel", ::loadEvselData)
+        //SeedUploader.uploadFromJson(this, "Endüstriyel", ::loadEndustriyelData)
+        //SeedUploader.uploadFromJson(this, "Peyzaj", ::loadPeyzajData)
+        //SeedUploader.uploadFromJson(this, "Kimyasal", ::loadKimyasalData)
 
         setContent {
             val context = LocalContext.current
@@ -73,6 +74,7 @@ class MainActivity : ComponentActivity() {
             WaterAppTheme {
                 AppNavigator(startDestination)
             }
+
         }
     }
 }
@@ -150,7 +152,7 @@ object CartManager {
 
     fun totalsByCurrency(): Map<String, Double> {
         return cart
-            .groupBy { it.urun.paraBirimi }
+            .groupBy { it.urun.paraBirimi ?: "USD" }
             .mapValues { entry ->
                 entry.value.sumOf {
                     (it.urun.fiyat ?: 0.0) * it.quantity.value
@@ -255,17 +257,28 @@ fun AppNavigator(startDestination: String) {
             var urun by remember { mutableStateOf<Urun?>(null) }
 
             LaunchedEffect(productId) {
-                ProductRepository.getProducts { list ->
-                    urun = list.find { it.id == productId }
-                }
+
+                FirebaseFirestore.getInstance()
+                    .collection("products")
+                    .document(productId)
+                    .get()
+                    .addOnSuccessListener { doc ->
+                        urun = doc.toObject(Urun::class.java)
+                            ?.copy(id = doc.id)
+                    }
             }
 
-            if (urun == null) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+
+            when (urun) {
+
+                null -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator()
                 }
-            } else {
-                EditProductScreen(urun!!, productId, navController)
+
+                else -> EditProductScreen(urun!!, productId, navController)
             }
         }
 
@@ -314,22 +327,30 @@ fun AppNavigator(startDestination: String) {
         composable("customerForm") {
             CustomerFormScreen(navController)
         }
-
-        // Evsel detay ekranı
         composable(
-            "evselDetail/{kategoriAdi}",
-            arguments = listOf(navArgument("kategoriAdi") { type = NavType.StringType })
+            "kategori/{ana}",
+            arguments = listOf(navArgument("ana") { type = NavType.StringType })
         ) { backStackEntry ->
 
-            val kategoriAdi =
-                backStackEntry.arguments?.getString("kategoriAdi")?.fromNavArg() ?: ""
+            val ana = backStackEntry.arguments?.getString("ana") ?: ""
 
-            DetailScreenProducts(kategoriAdi, navController)
+            DetailScreenCategory(ana, navController)
         }
-        // AppNavigator içinde
-        composable("evsel") {
-            DetailScreenCategory(navController) // evsel kategorisi için detay ekranı
+
+        composable(
+            "urunler/{ana}/{alt}",
+            arguments = listOf(
+                navArgument("ana") { type = NavType.StringType },
+                navArgument("alt") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val ana = backStackEntry.arguments?.getString("ana") ?: ""
+            val alt = backStackEntry.arguments?.getString("alt") ?: ""
+
+            DetailScreenProducts(ana, alt, navController)
         }
+
         // Login ekranı
         composable("login") {
             LoginScreen(navController)
@@ -417,8 +438,8 @@ fun LoginScreen(navController: NavHostController) {
 fun CategoryScreen(navController: NavHostController) {
 
     val categories = listOf(
-        Triple("Evsel", "evsel", Icons.Default.Home),
-        Triple("Endüstriyel", "endustriyel", Icons.Default.Build),
+        Triple("Evsel", "kategori/Evsel", Icons.Default.Home),
+        Triple("Endüstriyel", "kategori/Endüstriyel", Icons.Default.Build),
         Triple("Kimyasal", "kimyasal", Icons.Default.Science),
         Triple("Peyzaj", "peyzaj", Icons.Default.Park)
     )
@@ -485,11 +506,15 @@ fun CategoryScreen(navController: NavHostController) {
 }
 
 @Composable
-fun DetailScreenCategory(navController: NavHostController) {
+fun DetailScreenCategory(
+anaKategori: String,
+navController: NavHostController
+)
+{
 
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(anaKategori) {
 
         val listener = FirebaseFirestore.getInstance()
             .collection("products")
@@ -501,8 +526,8 @@ fun DetailScreenCategory(navController: NavHostController) {
                         val ana = doc.getString("anaKategori")
                             ?: doc.getString("kategori") // eski alan
 
-                        if (ana == "Evsel")
-                            doc.getString("altKategori")
+                        if (ana == anaKategori)
+                        doc.getString("altKategori")
                         else null
                     }
                     ?.distinct()
@@ -513,7 +538,7 @@ fun DetailScreenCategory(navController: NavHostController) {
         onDispose { listener.remove() }
     }
 
-    AppScaffold("Evsel Ürün Kategorileri", navController) { padding ->
+    AppScaffold("$anaKategori Kategorileri", navController) { padding ->
 
         LazyColumn(
             modifier = Modifier
@@ -532,7 +557,7 @@ fun DetailScreenCategory(navController: NavHostController) {
                         .padding(vertical = 8.dp)
                         .clickable {
                             navController.navigate(
-                                "evselDetail/${kategori.toNavArg()}"
+                                "urunler/$anaKategori/${kategori.toNavArg()}"
                             )
                         }
                 ) {
@@ -549,6 +574,7 @@ fun DetailScreenCategory(navController: NavHostController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreenProducts(
+    anaKategori: String,
     kategoriAdi: String,
     navController: NavHostController
 ) {
@@ -559,7 +585,7 @@ fun DetailScreenProducts(
 
         val listener = FirebaseFirestore.getInstance()
             .collection("products")
-            .whereEqualTo("anaKategori", "Evsel")
+            .whereEqualTo("anaKategori", anaKategori)
             .whereEqualTo("altKategori", kategoriAdi)
             .addSnapshotListener { snapshot, _ ->
                 urunler = snapshot?.documents?.map { doc ->
@@ -588,7 +614,7 @@ fun DetailScreenProducts(
                     if (CartManager.SessionManager.isStaff) {
                         IconButton(onClick = {
                             navController.navigate(
-                                "add_product_form/${"Evsel".toNavArg()}/${kategoriAdi.toNavArg()}"
+                                "add_product_form/${anaKategori.toNavArg()}/${kategoriAdi.toNavArg()}"
                             )
                         }) {
                             Icon(Icons.Default.Add, contentDescription = "Ürün ekle")
@@ -646,7 +672,10 @@ fun DetailScreenProducts(
                             urun.asama?.let { Text("Aşama: $it") }
                             urun.membran_gpd?.let { Text("Membran: $it GPD") }
                             urun.tank_galon?.let { Text("Tank: $it Galon") }
-
+                            urun.model?.let { Text("Model: $it") }
+                            urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
+                            urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
+                            urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
 
 
                             TextButton(onClick = { expanded = !expanded }) {
@@ -704,6 +733,13 @@ fun loadEvselData(context: Context): Root {
         .use { it.readText() }
 
     return Gson().fromJson(jsonString, Root::class.java)
+}
+fun loadEndustriyelData(context: Context): Root {
+    val json = context.assets.open("endustriyel_products.json")
+        .bufferedReader()
+        .use { it.readText() }
+
+    return Gson().fromJson(json, Root::class.java)
 }
 
 @Composable
@@ -986,8 +1022,11 @@ fun EditProductScreen(
     productId: String,
     navController: NavHostController
 ) {
+    val isEvsel = urun.anaKategori == "Evsel"
+    val isEndustriyel = urun.anaKategori == "Endüstriyel"
 
-    var model by rememberSaveable { mutableStateOf(urun.urun_adi) }
+    // --- State değişkenleri ---
+    var model by rememberSaveable { mutableStateOf(urun.model ?: "") }
     var marka by rememberSaveable { mutableStateOf(urun.marka ?: "") }
     var pompa by rememberSaveable { mutableStateOf(urun.pompa ?: "") }
     var asama by rememberSaveable { mutableStateOf(urun.asama ?: "") }
@@ -995,6 +1034,13 @@ fun EditProductScreen(
     var tank by rememberSaveable { mutableStateOf(urun.tank_galon?.toString() ?: "") }
     var kod by rememberSaveable { mutableStateOf(urun.urun_kodu?.toString() ?: "") }
     var fiyat by rememberSaveable { mutableStateOf(urun.fiyat?.toString() ?: "") }
+    var debi by rememberSaveable { mutableStateOf(urun.debi_m3_saat?.toString() ?: "") }
+    var urunAdi by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+    //var tankBaglanti by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+    //var girisCikisBaglanti by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+    //var paraBirimi by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+    //var  ozellikler by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+
 
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -1022,33 +1068,50 @@ fun EditProductScreen(
                 .padding(padding)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
-
         ) {
 
-            item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
+            // --- Endüstriyel ürün alanları ---
+            if (isEndustriyel) {
+                item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
+                item { OutlinedTextField(debi, { debi = it }, label = { Text("Debi (m³/saat)") }) }
+
+            }
+
+            // --- Evsel ürün alanları ---
+            if (isEvsel) {
+                item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
+                item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
+                item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran (GPD)") }) }
+                item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank (Galon)") }) }
+
+            }
+
+            // --- Ortak alanlar ---
+            // --- Ortak alanlar ---
+            item { OutlinedTextField(urunAdi, { urunAdi = it }, label = { Text("Ürün Adı") }) }
             item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
-            item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
-            item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
-            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran") }) }
-            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank") }) }
             item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
             item { OutlinedTextField(fiyat, { fiyat = it }, label = { Text("Fiyat USD") }) }
 
-            // ✅ KAYDET
+
+            // --- Kaydet butonu ---
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
 
                         val updated = urun.copy(
-                            urun_adi = model,
+                            urun_adi = urunAdi,
+                            model = model,
                             marka = marka,
                             pompa = pompa,
                             asama = asama,
                             membran_gpd = membran.toDoubleOrNull(),
                             tank_galon = tank.toDoubleOrNull(),
                             urun_kodu = kod.toIntOrNull(),
-                            fiyat = fiyat.toDoubleOrNull()
+                            fiyat = fiyat.toDoubleOrNull(),
+                            debi_m3_saat = debi.toDoubleOrNull(),
+
                         )
 
                         ProductRepository.updateProduct(productId, updated)
@@ -1059,12 +1122,10 @@ fun EditProductScreen(
                             navController.popBackStack()
                         }
                     }
-                ) {
-                    Text("Kaydet")
-                }
+                ) { Text("Kaydet") }
             }
 
-            // ✅ SİL
+            // --- Sil butonu ---
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -1072,13 +1133,11 @@ fun EditProductScreen(
                         containerColor = MaterialTheme.colorScheme.error
                     ),
                     onClick = { showDeleteDialog = true }
-                ) {
-                    Text("Sil")
-                }
+                ) { Text("Sil") }
             }
         }
 
-        // ✅ DELETE DIALOG
+        // --- Silme dialogu ---
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
@@ -1091,21 +1150,19 @@ fun EditProductScreen(
                                 .collection("products")
                                 .document(productId)
                                 .delete()
-
                             showDeleteDialog = false
                             navController.popBackStack()
                         }
                     ) { Text("Evet") }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { showDeleteDialog = false }
-                    ) { Text("Hayır") }
+                    TextButton(onClick = { showDeleteDialog = false }) { Text("Hayır") }
                 }
             )
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1168,7 +1225,7 @@ fun CustomerFormScreen(navController: NavHostController) {
                                 model = it.urun.urun_adi,
                                 quantity = it.quantity.value,
                                 price = it.urun.fiyat ?: 0.0,
-                                currency = it.urun.paraBirimi
+                                currency = it.urun.paraBirimi ?: "USD"
                             )
                         }
 
@@ -1597,6 +1654,7 @@ fun MainLayout(
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddProductFormScreen(
@@ -1605,7 +1663,7 @@ fun AddProductFormScreen(
     altKategori: String
 ) {
 
-    var model by rememberSaveable { mutableStateOf("") }
+    var urunAdi by rememberSaveable { mutableStateOf("") }
     var marka by rememberSaveable { mutableStateOf("") }
     var pompa by rememberSaveable { mutableStateOf("") }
     var asama by rememberSaveable { mutableStateOf("") }
@@ -1614,6 +1672,12 @@ fun AddProductFormScreen(
     var kod by rememberSaveable { mutableStateOf("") }
     var fiyat by rememberSaveable { mutableStateOf("") }
     var ozellikler by rememberSaveable { mutableStateOf("") }
+
+    var tankBaglanti by rememberSaveable { mutableStateOf("") }
+    var girisCikis by rememberSaveable { mutableStateOf("") }
+    var debi by rememberSaveable { mutableStateOf("") }
+    var sayfa by rememberSaveable { mutableStateOf("") }
+    var sayfaPdf by rememberSaveable { mutableStateOf("") }
 
     var paraBirimi by rememberSaveable { mutableStateOf("USD") }
     var expanded by remember { mutableStateOf(false) }
@@ -1647,25 +1711,40 @@ fun AddProductFormScreen(
                 Text("Kategori: $anaKategori / $altKategori")
             }
 
-            item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
-            item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
-            item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
-            item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
-            item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran") }) }
-            item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank") }) }
-            item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
+            fun field(value: String, onChange: (String) -> Unit, label: String) {
+                item {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onChange,
+                        label = { Text(label) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
 
-            // ✅ Fiyat
+            field(urunAdi, { urunAdi = it }, "Ürün Adı")
+            field(marka, { marka = it }, "Marka")
+            field(pompa, { pompa = it }, "Pompa")
+            field(asama, { asama = it }, "Aşama")
+            field(membran, { membran = it }, "Membran")
+            field(tank, { tank = it }, "Tank")
+            field(kod, { kod = it }, "Ürün Kodu")
+            field(tankBaglanti, { tankBaglanti = it }, "Tank Bağlantı")
+            field(girisCikis, { girisCikis = it }, "Giriş / Çıkış")
+            field(debi, { debi = it }, "Debi m3/saat")
+            field(sayfa, { sayfa = it }, "Sayfa")
+            field(sayfaPdf, { sayfaPdf = it }, "PDF Sayfa")
+
             item {
                 OutlinedTextField(
-                    fiyat,
-                    { fiyat = it },
+                    value = fiyat,
+                    onValueChange = { fiyat = it },
                     label = { Text("Fiyat") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // ✅ PARA BİRİMİ DROPDOWN
+            // ✅ Para birimi dropdown
             item {
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -1701,7 +1780,7 @@ fun AddProductFormScreen(
                 }
             }
 
-            item { OutlinedTextField(ozellikler, { ozellikler = it }, label = { Text("Özellikler") }) }
+            field(ozellikler, { ozellikler = it }, "Özellikler")
 
             item {
                 Button(
@@ -1711,12 +1790,15 @@ fun AddProductFormScreen(
                         val urun = Urun(
                             anaKategori = anaKategori,
                             altKategori = altKategori,
-                            urun_adi = model,
+                            urun_adi = urunAdi,
                             marka = marka,
                             pompa = pompa,
                             asama = asama,
                             membran_gpd = membran.toDoubleOrNull(),
                             tank_galon = tank.toDoubleOrNull(),
+                            tank_baglanti = tankBaglanti,
+                            giris_cikis_baglanti = girisCikis,
+                            debi_m3_saat = debi.toDoubleOrNull(),
                             urun_kodu = kod.toIntOrNull(),
                             fiyat = fiyat.toDoubleOrNull(),
                             paraBirimi = paraBirimi,
@@ -1740,6 +1822,7 @@ fun AddProductFormScreen(
         }
     }
 }
+
 @Composable
 fun EditOrderScreen(orderId: String, navController: NavHostController) {
 
