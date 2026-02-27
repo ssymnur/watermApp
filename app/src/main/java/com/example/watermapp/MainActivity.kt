@@ -1,6 +1,5 @@
 package com.example.watermapp
 
-import android.R.attr.category
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -34,12 +33,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,10 +47,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Science
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.navigation.NavController
+import androidx.compose.ui.text.style.TextAlign
 import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -82,7 +77,6 @@ class MainActivity : ComponentActivity() {
             WaterAppTheme {
                 AppNavigator(startDestination)
             }
-
         }
     }
 }
@@ -134,7 +128,7 @@ data class Order(
 )
 
 data class CartItem(
-    val urun: Urun,
+    val urun: BaseUrun,
     var quantity: MutableState<Int> = mutableStateOf(1)
 )
 object CartManager {
@@ -204,7 +198,7 @@ object CartManager {
         return total
     }
 
-    fun add(urun: Urun) {
+    fun add(urun: BaseUrun) {
         val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
 
         if (existing != null) {
@@ -218,7 +212,7 @@ object CartManager {
         var isStaff by mutableStateOf(false)
     }
 
-    fun remove(urun: Urun) {
+    fun remove(urun: BaseUrun) {
         val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
 
         if (existing != null) {
@@ -230,7 +224,7 @@ object CartManager {
         }
     }
 
-    fun getQuantity(urun: Urun): Int {
+    fun getQuantity(urun: BaseUrun): Int {
         return cart.find { it.urun.urun_adi == urun.urun_adi }
             ?.quantity?.value ?: 0
     }
@@ -265,16 +259,32 @@ fun AppNavigator(startDestination: String) {
             val productId =
                 backStackEntry.arguments?.getString("productId") ?: ""
 
-            var urun by remember { mutableStateOf<Urun?>(null) }
+            var urun by remember { mutableStateOf<BaseUrun?>(null) }
 
             LaunchedEffect(productId) {
+
                 FirebaseFirestore.getInstance()
                     .collection("products")
                     .document(productId)
                     .get()
                     .addOnSuccessListener { doc ->
-                        urun = doc.toObject(Urun::class.java)
-                            ?.copy(id = doc.id)
+
+                        urun = when (doc.getString("anaKategori")) {
+
+                            "Evsel" ->
+                                doc.toObject(EvselUrun::class.java)
+                                    ?.copy(id = doc.id)
+
+                            "Endüstriyel" ->
+                                doc.toObject(EndustriyelUrun::class.java)
+                                    ?.copy(id = doc.id)
+
+                            "Peyzaj" ->
+                                doc.toObject(PeyzajUrun::class.java)
+                                    ?.copy(id = doc.id)
+
+                            else -> null
+                        }
                     }
             }
 
@@ -547,8 +557,8 @@ fun CategoryScreen(navController: NavHostController) {
     val categories = listOf(
         Triple("Evsel", "kategori/Evsel", Icons.Default.Home),
         Triple("Endüstriyel", "kategori/Endüstriyel", Icons.Default.Build),
-        Triple("Kimyasal", "kimyasal", Icons.Default.Science),
-        Triple("Peyzaj", "peyzaj", Icons.Default.Park)
+        Triple("Kimyasal", "kategori/Kimyasal", Icons.Default.Science),
+        Triple("Peyzaj", "kategori/Peyzaj", Icons.Default.Park)
     )
 
     Column(
@@ -622,24 +632,35 @@ fun DetailScreenCategory(
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
     DisposableEffect(anaKategori) {
-        val listener = FirebaseFirestore.getInstance()
-            .collection("products")
-            .addSnapshotListener { snapshot, _ ->
-                kategoriler = snapshot?.documents
-                    ?.mapNotNull { doc ->
-                        val ana = doc.getString("anaKategori")
-                            ?: doc.getString("kategori")
 
-                        if (ana == anaKategori)
-                            doc.getString("altKategori")
-                        else null
-                    }
-                    ?.distinct()
-                    ?.sorted()
-                    ?: emptyList()
-            }
+        if (anaKategori == "Peyzaj") {
 
-        onDispose { listener.remove() }
+            // 🔥 SABİT ALT KATEGORİLER
+            kategoriler = listOf("POELSAN", "RAINBIRD")
+
+            onDispose { }
+
+        } else {
+
+            val listener = FirebaseFirestore.getInstance()
+                .collection("products")
+                .addSnapshotListener { snapshot, _ ->
+                    kategoriler = snapshot?.documents
+                        ?.mapNotNull { doc ->
+                            val ana = doc.getString("anaKategori")
+                                ?: doc.getString("kategori")
+
+                            if (ana == anaKategori)
+                                doc.getString("altKategori")
+                            else null
+                        }
+                        ?.distinct()
+                        ?.sorted()
+                        ?: emptyList()
+                }
+
+            onDispose { listener.remove() }
+        }
     }
 
     Scaffold(
@@ -727,6 +748,38 @@ fun DetailScreenCategory(
         }
     }
 }
+@Composable
+fun EvselUrunOzellikleri(urun: EvselUrun) {
+
+    urun.pompa?.let { Text("Pompa: $it") }
+    urun.asama?.let { Text("Aşama: $it") }
+    urun.membran_gpd?.let { Text("Membran: $it GPD") }
+    urun.tank_galon?.let { Text("Tank: $it Galon") }
+}
+@Composable
+fun EndustriyelUrunOzellikleri(urun: EndustriyelUrun) {
+
+    Column {
+
+        urun.model?.let { Text("Model: $it") }
+        urun.debi_m3_saat?.let { Text("Debi: $it m³/saat") }
+        urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
+        urun.giris_cikis_baglanti?.let { Text("Giriş / Çıkış: $it") }
+
+    }
+}
+@Composable
+fun PeyzajUrunOzellikleri(urun: PeyzajUrun) {
+
+    Column {
+
+        urun.nozul_rengi?.let { Text("Nozul Rengi: $it") }
+        urun.atis_mesafesi?.let { Text("Atış Mesafesi: $it") }
+        urun.basinc_degeri?.let { Text("Basınç: $it") }
+
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -735,24 +788,38 @@ fun DetailScreenProducts(
     kategoriAdi: String,
     navController: NavHostController
 ) {
-    var urunler by remember { mutableStateOf<List<Urun>>(emptyList()) }
 
-    // 🔥 FIREBASE CANLI LİSTE
-    DisposableEffect(kategoriAdi) {
+    var urunler by remember { mutableStateOf<List<BaseUrun>>(emptyList()) }
+
+    // 🔥 FIREBASE CANLI LİSTE (SEALED CLASS UYUMLU)
+    DisposableEffect(anaKategori, kategoriAdi) {
 
         val listener = FirebaseFirestore.getInstance()
             .collection("products")
             .whereEqualTo("anaKategori", anaKategori)
             .whereEqualTo("altKategori", kategoriAdi)
             .addSnapshotListener { snapshot, _ ->
-                urunler = snapshot?.documents?.map { doc ->
-                    doc.toObject(Urun::class.java)!!.copy(id = doc.id)
-                } ?: listOf()
+
+                urunler = snapshot?.documents?.mapNotNull { doc ->
+
+                    when (anaKategori) {
+
+                        "Evsel" ->
+                            doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
+
+                        "Endüstriyel" ->
+                            doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
+
+                        "Peyzaj" ->
+                            doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
+
+                        else -> null
+                    }
+
+                } ?: emptyList()
             }
 
-        onDispose {
-            listener.remove()
-        }
+        onDispose { listener.remove() }
     }
 
     Scaffold(
@@ -766,16 +833,13 @@ fun DetailScreenProducts(
                     }
                 },
                 actions = {
-
-                    // ✅ SADECE PERSONEL GÖRSÜN
                     if (CartManager.SessionManager.isStaff) {
                         IconButton(onClick = {
                             navController.navigate(
                                 "add_product_form/${anaKategori.toNavArg()}/${kategoriAdi.toNavArg()}"
                             )
                         }) {
-                            Icon(Icons.Default.Add, contentDescription = "" +
-                                    "")
+                            Icon(Icons.Default.Add, contentDescription = "")
                         }
                     }
                 }
@@ -805,12 +869,14 @@ fun DetailScreenProducts(
             items(urunler) { urun ->
 
                 val qty = CartManager.getQuantity(urun)
+                var expanded by remember { mutableStateOf(false) }
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 6.dp)
                 ) {
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -818,23 +884,44 @@ fun DetailScreenProducts(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
 
-                        var expanded by remember { mutableStateOf(false) }
-
                         Column(modifier = Modifier.weight(1f)) {
 
-                            Text(urun.urun_adi, style = MaterialTheme.typography.titleMedium)
-                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi}")
+                            Text(
+                                urun.urun_adi,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
+
                             urun.marka?.let { Text("Marka: $it") }
                             urun.urun_kodu?.let { Text("Kod: $it") }
-                            urun.pompa?.let { Text("Pompa: $it") }
-                            urun.asama?.let { Text("Aşama: $it") }
-                            urun.membran_gpd?.let { Text("Membran: $it GPD") }
-                            urun.tank_galon?.let { Text("Tank: $it Galon") }
-                            urun.model?.let { Text("Model: $it") }
-                            urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
-                            urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
-                            urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
 
+                            // 🔥 KATEGORİYE GÖRE TÜM ÖZELLİKLER
+
+                            when (urun) {
+
+                                is EvselUrun -> {
+                                    urun.pompa?.let { Text("Pompa: $it") }
+                                    urun.asama?.let { Text("Aşama: $it") }
+                                    urun.membran_gpd?.let { Text("Membran: $it GPD") }
+                                    urun.tank_galon?.let { Text("Tank: $it Galon") }
+                                }
+
+                                is EndustriyelUrun -> {
+                                    urun.model?.let { Text("Model: $it") }
+                                    urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
+                                    urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
+                                    urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
+                                }
+
+                                is PeyzajUrun -> {
+                                    urun.nozul_rengi?.let { Text("Nozul: $it") }
+                                    urun.atis_mesafesi?.let { Text("Atış: $it") }
+                                    urun.basinc_degeri?.let { Text("Basınç: $it") }
+                                    urun.ambalaj_adedi?.let { Text("Ambalaj: $it") }
+                                    urun.kutu_adedi?.let { Text("Kutu: $it") }
+                                }
+                            }
 
                             TextButton(onClick = { expanded = !expanded }) {
                                 Text(if (expanded) "Gizle" else "Açıklama")
@@ -843,8 +930,7 @@ fun DetailScreenProducts(
                             if (expanded) {
                                 Text(
                                     text = urun.ozellikler ?: "Bilgi yok",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = Int.MAX_VALUE
+                                    style = MaterialTheme.typography.bodySmall
                                 )
                             }
 
@@ -868,7 +954,7 @@ fun DetailScreenProducts(
                             Text(
                                 text = qty.toString(),
                                 modifier = Modifier.width(32.dp),
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.titleMedium
                             )
 
@@ -897,22 +983,6 @@ fun loadEndustriyelData(context: Context): Root {
         .use { it.readText() }
 
     return Gson().fromJson(json, Root::class.java)
-}
-
-@Composable
-fun CategoryButton(
-    title: String,
-    route: String,
-    navController: NavHostController
-) {
-    Button(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        onClick = { navController.navigate(route) }
-    ) {
-        Text(title)
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1410,98 +1480,6 @@ fun ProjelerScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddProjectProductScreen(
-    projeAdi: String,
-    navController: NavHostController
-) {
-
-    val db = FirebaseFirestore.getInstance()
-
-    var urunler by remember { mutableStateOf<List<Urun>>(emptyList()) }
-
-    DisposableEffect(Unit) {
-
-        val listener = db
-            .collection("products")
-            .whereEqualTo("anaKategori", "Endüstriyel")
-            .addSnapshotListener { snapshot, error ->
-
-                if (error != null) return@addSnapshotListener
-
-                urunler = snapshot?.documents?.map { doc ->
-                    Urun(
-                        id = doc.id,
-                        urun_adi = doc.getString("urun_adi") ?: "",
-                        fiyat = doc.getDouble("fiyat"),
-                        paraBirimi = doc.getString("paraBirimi") ?: "",
-                        marka = doc.getString("marka") ?: ""
-                    )
-                } ?: emptyList()
-            }
-
-        onDispose { listener.remove() }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Ürün Seç - $projeAdi") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-
-            items(urunler) { urun ->
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                        .clickable {
-
-                            // ✅ PROJEYE EKLE
-                            db.collection("projects")
-                                .document(projeAdi)
-                                .collection("urunler")
-                                .document(urun.id)
-                                .set(
-                                    mapOf(
-                                        "urun_adi" to urun.urun_adi,
-                                        "fiyat" to urun.fiyat,
-                                        "paraBirimi" to urun.paraBirimi,
-                                        "marka" to urun.marka,
-                                        "id" to urun.id,
-                                        "anaKategori" to urun.anaKategori,
-                                        "altKategori" to urun.altKategori,
-                                        )
-                                )
-                                .addOnSuccessListener {
-                                    navController.popBackStack()
-                                }
-                        }
-                ) {
-                    Text(
-                        text = urun.urun_adi,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun ProjeDetayScreen(
     projeAdi: String,
     navController: NavHostController
@@ -1509,14 +1487,14 @@ fun ProjeDetayScreen(
 
     val db = FirebaseFirestore.getInstance()
 
-    var urunler by remember { mutableStateOf<List<Urun>>(emptyList()) }
-    var silinecekUrun by remember { mutableStateOf<Urun?>(null) }
+    var urunler by remember { mutableStateOf<List<BaseUrun>>(emptyList()) }
+    var silinecekUrun by remember { mutableStateOf<BaseUrun?>(null) }
     var isLoading by remember { mutableStateOf(true) }
 
     val isStaff = CartManager.SessionManager.isStaff
 
+    // 🔹 Firestore Listener
     DisposableEffect(projeAdi) {
-
         val listener = db
             .collection("projects")
             .document(projeAdi)
@@ -1530,43 +1508,13 @@ fun ProjeDetayScreen(
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
 
-                    fun getSafeDouble(field: String): Double? {
-                        return when (val value = doc.get(field)) {
-                            is Double -> value
-                            is Long -> value.toDouble()
-                            is String -> value.toDoubleOrNull()
-                            else -> null
-                        }
-                    }
+                    when (doc.getString("anaKategori")) {
 
-                    fun getSafeInt(field: String): Int? {
-                        return when (val value = doc.get(field)) {
-                            is Long -> value.toInt()
-                            is Double -> value.toInt()
-                            is String -> value.toIntOrNull()
-                            else -> null
-                        }
+                        "Evsel" -> doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
+                        "Endüstriyel" -> doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
+                        "Peyzaj" -> doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
+                        else -> null
                     }
-
-                    Urun(
-                        id = doc.id,
-                        anaKategori = doc.getString("anaKategori") ?: "",
-                        altKategori = doc.getString("altKategori") ?: "",
-                        urun_adi = doc.getString("urun_adi") ?: "",
-                        model = doc.getString("model"),
-                        marka = doc.getString("marka"),
-                        pompa = doc.getString("pompa"),
-                        asama = doc.getString("asama"),
-                        membran_gpd = getSafeDouble("membran_gpd"),
-                        tank_galon = getSafeDouble("tank_galon"),
-                        tank_baglanti = doc.getString("tank_baglanti"),
-                        giris_cikis_baglanti = doc.getString("giris_cikis_baglanti"),
-                        debi_m3_saat = getSafeDouble("debi_m3_saat"),
-                        urun_kodu = getSafeInt("urun_kodu"),
-                        fiyat = getSafeDouble("fiyat"),
-                        paraBirimi = doc.getString("paraBirimi") ?: "USD",
-                        ozellikler = doc.getString("ozellikler")
-                    )
 
                 } ?: emptyList()
 
@@ -1582,7 +1530,7 @@ fun ProjeDetayScreen(
                 title = { Text(projeAdi) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
                     }
                 },
                 actions = {
@@ -1631,10 +1579,9 @@ fun ProjeDetayScreen(
                         .fillMaxSize()
                         .padding(padding)
                 ) {
-
                     items(
                         items = urunler,
-                        key = { it.id ?: it.hashCode() }
+                        key = { it.id }
                     ) { urun ->
 
                         val dismissState = rememberSwipeToDismissBoxState()
@@ -1652,65 +1599,60 @@ fun ProjeDetayScreen(
 
                         SwipeToDismissBox(
                             state = dismissState,
-                            enableDismissFromStartToEnd =
-                                CartManager.SessionManager.isStaff,
+                            enableDismissFromStartToEnd = isStaff,
                             enableDismissFromEndToStart = false,
                             backgroundContent = {
-
                                 Row(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color.White), // ✅ Beyaz
+                                        .background(Color.White),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Start
                                 ) {
                                     Spacer(modifier = Modifier.width(24.dp))
-
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = Color.Red // ✅ Sadece ikon kırmızı
-                                    )
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
                                 }
                             }
                         ) {
-
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(12.dp)
                             ) {
-
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(16.dp)
                                 ) {
-
-                                    Text(
-                                        text = urun.urun_adi ?: "-",
-                                        style = MaterialTheme.typography.titleLarge
-                                    )
-
+                                    Text(urun.urun_adi ?: "-", style = MaterialTheme.typography.titleLarge)
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    Text("Kod: ${urun.urun_kodu ?: "-"}")
+                                    when (urun) {
+                                        is EvselUrun -> {
+                                            Text("Pompa: ${urun.pompa ?: "-"}")
+                                            Text("Aşama: ${urun.asama ?: "-"}")
+                                            Text("Membran: ${urun.membran_gpd ?: "-"} GPD")
+                                            Text("Tank: ${urun.tank_galon ?: "-"} Galon")
+                                        }
+                                        is EndustriyelUrun -> {
+                                            Text("Model: ${urun.model ?: "-"}")
+                                            Text("Debi: ${urun.debi_m3_saat ?: "-"} m³/saat")
+                                            Text("Tank Bağlantı: ${urun.tank_baglanti ?: "-"}")
+                                            Text("Giriş/Çıkış: ${urun.giris_cikis_baglanti ?: "-"}")
+                                        }
+                                        is PeyzajUrun -> {
+                                            Text("Nozul Rengi: ${urun.nozul_rengi ?: "-"}")
+                                            Text("Atış Mesafesi: ${urun.atis_mesafesi ?: "-"}")
+                                        }
+                                    }
+
                                     Text("Marka: ${urun.marka ?: "-"}")
+                                    Text("Kod: ${urun.urun_kodu ?: "-"}")
                                     Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi}")
-                                    Text("Pompa: ${urun.pompa ?: "-"}")
-                                    Text("Aşama: ${urun.asama ?: "-"}")
-                                    Text("Membran: ${urun.membran_gpd ?: "-"}")
-                                    Text("Tank: ${urun.tank_galon ?: "-"}")
-                                    Text("Model: ${urun.model ?: "-"}")
-                                    Text("Tank Bağlantı: ${urun.tank_baglanti ?: "-"}")
-                                    Text("Giriş/Çıkış: ${urun.giris_cikis_baglanti ?: "-"}")
-                                    Text("Debi: ${urun.debi_m3_saat ?: "-"}")
                                     Text("Özellikler: ${urun.ozellikler ?: "-"}")
 
-                                    if (isStaff && urun.id != null) {
-
+                                    if (isStaff) {
                                         Spacer(modifier = Modifier.height(12.dp))
-
                                         TextButton(
                                             onClick = {
                                                 navController.navigate(
@@ -1718,9 +1660,7 @@ fun ProjeDetayScreen(
                                                 )
                                             },
                                             modifier = Modifier.align(Alignment.End)
-                                        ) {
-                                            Text("Düzenle")
-                                        }
+                                        ) { Text("Düzenle") }
                                     }
                                 }
                             }
@@ -1730,8 +1670,8 @@ fun ProjeDetayScreen(
             }
         }
 
+        // 🔹 Silme Dialogu
         silinecekUrun?.let { urun ->
-
             AlertDialog(
                 onDismissRequest = { silinecekUrun = null },
                 title = { Text("Ürünü Sil") },
@@ -1739,27 +1679,17 @@ fun ProjeDetayScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-
-                            urun.id?.let { id ->
-                                db.collection("projects")
-                                    .document(projeAdi)
-                                    .collection("urunler")
-                                    .document(id)
-                                    .delete()
-                            }
-
+                            db.collection("projects")
+                                .document(projeAdi)
+                                .collection("urunler")
+                                .document(urun.id)
+                                .delete()
                             silinecekUrun = null
                         }
-                    ) {
-                        Text("Evet", color = Color.Red)
-                    }
+                    ) { Text("Evet", color = Color.Red) }
                 },
                 dismissButton = {
-                    TextButton(
-                        onClick = { silinecekUrun = null }
-                    ) {
-                        Text("Vazgeç")
-                    }
+                    TextButton(onClick = { silinecekUrun = null }) { Text("Vazgeç") }
                 }
             )
         }
@@ -1949,48 +1879,42 @@ fun FormField(
 }
 
 
-fun projeOlustur(projeAdi: String) {
-
-    FirebaseFirestore.getInstance()
-        .collection("projects")
-        .document(projeAdi)
-        .set(
-            mapOf(
-                "createdAt" to System.currentTimeMillis()
-            )
-        )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProductScreen(
-    urun: Urun,
+    urun: BaseUrun,
     productId: String,
     navController: NavHostController
 ) {
-    val isEvsel = urun.anaKategori == "Evsel"
-    val isEndustriyel = urun.anaKategori == "Endüstriyel"
 
-    // --- State değişkenleri ---
-    var model by rememberSaveable { mutableStateOf(urun.model ?: "") }
+    // ---------------- ORTAK STATE ----------------
+
+    var urunAdi by rememberSaveable { mutableStateOf(urun.urun_adi) }
     var marka by rememberSaveable { mutableStateOf(urun.marka ?: "") }
-    var pompa by rememberSaveable { mutableStateOf(urun.pompa ?: "") }
-    var asama by rememberSaveable { mutableStateOf(urun.asama ?: "") }
-    var membran by rememberSaveable { mutableStateOf(urun.membran_gpd?.toString() ?: "") }
-    var tank by rememberSaveable { mutableStateOf(urun.tank_galon?.toString() ?: "") }
     var kod by rememberSaveable { mutableStateOf(urun.urun_kodu?.toString() ?: "") }
     var fiyat by rememberSaveable { mutableStateOf(urun.fiyat?.toString() ?: "") }
-    var debi by rememberSaveable { mutableStateOf(urun.debi_m3_saat?.toString() ?: "") }
-    var urunAdi by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
-    var paraBirimi by rememberSaveable { mutableStateOf(urun.paraBirimi ?: "USD") }
+    var paraBirimi by rememberSaveable { mutableStateOf(urun.paraBirimi) }
 
     val currencyOptions = listOf("USD", "TL", "EUR")
     var expandedCurrency by remember { mutableStateOf(false) }
-
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    // ---------------- KATEGORİYE ÖZEL STATE ----------------
+
+    var model by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.model ?: "") }
+    var debi by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.debi_m3_saat?.toString() ?: "") }
+
+    var pompa by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.pompa ?: "") }
+    var asama by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.asama ?: "") }
+    var membran by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.membran_gpd?.toString() ?: "") }
+    var tank by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.tank_galon?.toString() ?: "") }
+
+    var nozul by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.nozul_rengi ?: "") }
+    var atis by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.atis_mesafesi ?: "") }
+    var basinc by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.basinc_degeri ?: "") }
 
     Scaffold(
         topBar = {
@@ -1998,7 +1922,7 @@ fun EditProductScreen(
                 title = { Text("Ürünü Düzenle") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 }
             )
@@ -2014,32 +1938,43 @@ fun EditProductScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
-            // --- Endüstriyel ürün alanları ---
-            if (isEndustriyel) {
-                item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
-                item { OutlinedTextField(debi, { debi = it }, label = { Text("Debi (m³/saat)") }) }
-            }
+            // -------- ORTAK ALANLAR --------
 
-            // --- Evsel ürün alanları ---
-            if (isEvsel) {
-                item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
-                item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
-                item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran (GPD)") }) }
-                item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank (Galon)") }) }
-            }
-
-            // --- Ortak alanlar ---
             item { OutlinedTextField(urunAdi, { urunAdi = it }, label = { Text("Ürün Adı") }) }
             item { OutlinedTextField(marka, { marka = it }, label = { Text("Marka") }) }
             item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
 
-            //var tankBaglanti by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
-            //var girisCikisBaglanti by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
-            //var  ozellikler by rememberSaveable { mutableStateOf(urun.urun_adi?.toString() ?: "") }
+            // -------- KATEGORİYE GÖRE --------
 
-            // --- Fiyat ve para birimi ---
+            when (urun) {
+
+                is EvselUrun -> {
+
+                    item { OutlinedTextField(pompa, { pompa = it }, label = { Text("Pompa") }) }
+                    item { OutlinedTextField(asama, { asama = it }, label = { Text("Aşama") }) }
+                    item { OutlinedTextField(membran, { membran = it }, label = { Text("Membran (GPD)") }) }
+                    item { OutlinedTextField(tank, { tank = it }, label = { Text("Tank (Galon)") }) }
+                }
+
+                is EndustriyelUrun -> {
+
+                    item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
+                    item { OutlinedTextField(debi, { debi = it }, label = { Text("Debi (m³/saat)") }) }
+                }
+
+                is PeyzajUrun -> {
+
+                    item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
+                    item { OutlinedTextField(atis, { atis = it }, label = { Text("Atış Mesafesi") }) }
+                    item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
+                }
+            }
+
+            // -------- FİYAT --------
+
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+
                     OutlinedTextField(
                         value = fiyat,
                         onValueChange = { fiyat = it },
@@ -2053,15 +1988,16 @@ fun EditProductScreen(
                         OutlinedButton(onClick = { expandedCurrency = true }) {
                             Text(paraBirimi)
                         }
+
                         DropdownMenu(
                             expanded = expandedCurrency,
                             onDismissRequest = { expandedCurrency = false }
                         ) {
-                            currencyOptions.forEach { currency ->
+                            currencyOptions.forEach {
                                 DropdownMenuItem(
-                                    text = { Text(currency) },
+                                    text = { Text(it) },
                                     onClick = {
-                                        paraBirimi = currency
+                                        paraBirimi = it
                                         expandedCurrency = false
                                     }
                                 )
@@ -2071,37 +2007,62 @@ fun EditProductScreen(
                 }
             }
 
-            // --- Kaydet butonu ---
+            // -------- KAYDET --------
+
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        val updated = urun.copy(
-                            urun_adi = urunAdi,
-                            model = model,
-                            marka = marka,
-                            pompa = pompa,
-                            asama = asama,
-                            membran_gpd = membran.toDoubleOrNull(),
-                            tank_galon = tank.toDoubleOrNull(),
-                            urun_kodu = kod.toIntOrNull(),
-                            fiyat = fiyat.toDoubleOrNull(),
-                            debi_m3_saat = debi.toDoubleOrNull(),
-                            paraBirimi = paraBirimi,
-                        )
+
+                        val updated: BaseUrun = when (urun) {
+
+                            is EvselUrun -> urun.copy(
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                pompa = pompa,
+                                asama = asama,
+                                membran_gpd = membran.toDoubleOrNull(),
+                                tank_galon = tank.toDoubleOrNull(),
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi
+                            )
+
+                            is EndustriyelUrun -> urun.copy(
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                model = model,
+                                debi_m3_saat = debi.toDoubleOrNull(),
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi
+                            )
+
+                            is PeyzajUrun -> urun.copy(
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                nozul_rengi = nozul,
+                                atis_mesafesi = atis,
+                                basinc_degeri = basinc,
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi
+                            )
+                        }
 
                         ProductRepository.updateProduct(productId, updated)
 
                         scope.launch {
-                            snackbarHostState.showSnackbar("Değişiklikler kaydedildi")
-                            delay(1200)
+                            snackbarHostState.showSnackbar("Kaydedildi")
+                            delay(1000)
                             navController.popBackStack()
                         }
                     }
                 ) { Text("Kaydet") }
             }
 
-            // --- Sil butonu ---
+            // -------- SİL --------
+
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -2113,7 +2074,6 @@ fun EditProductScreen(
             }
         }
 
-        // --- Silme dialogu ---
         if (showDeleteDialog) {
             AlertDialog(
                 onDismissRequest = { showDeleteDialog = false },
@@ -2122,17 +2082,19 @@ fun EditProductScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            FirebaseFirestore.getInstance()
+                            Firebase.firestore
                                 .collection("products")
                                 .document(productId)
                                 .delete()
-                            showDeleteDialog = false
+
                             navController.popBackStack()
                         }
                     ) { Text("Evet") }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteDialog = false }) { Text("Hayır") }
+                    TextButton(onClick = { showDeleteDialog = false }) {
+                        Text("Hayır")
+                    }
                 }
             )
         }
@@ -2649,7 +2611,6 @@ fun AddProductFormScreen(
     anaKategori: String,
     altKategori: String
 ) {
-
     var urunAdi by rememberSaveable { mutableStateOf("") }
     var marka by rememberSaveable { mutableStateOf("") }
     var pompa by rememberSaveable { mutableStateOf("") }
@@ -2660,6 +2621,7 @@ fun AddProductFormScreen(
     var fiyat by rememberSaveable { mutableStateOf("") }
     var ozellikler by rememberSaveable { mutableStateOf("") }
 
+    // Endüstriyel alanlar
     var tankBaglanti by rememberSaveable { mutableStateOf("") }
     var girisCikis by rememberSaveable { mutableStateOf("") }
     var debi by rememberSaveable { mutableStateOf("") }
@@ -2709,26 +2671,35 @@ fun AddProductFormScreen(
                 }
             }
 
+            // ✅ Ortak alanlar: ürün adı, marka, ürün kodu, fiyat, özellikler
             field(urunAdi, { urunAdi = it }, "Ürün Adı")
             field(marka, { marka = it }, "Marka")
-            field(pompa, { pompa = it }, "Pompa")
-            field(asama, { asama = it }, "Aşama")
-            field(membran, { membran = it }, "Membran")
-            field(tank, { tank = it }, "Tank")
             field(kod, { kod = it }, "Ürün Kodu")
-            field(tankBaglanti, { tankBaglanti = it }, "Tank Bağlantı")
-            field(girisCikis, { girisCikis = it }, "Giriş / Çıkış")
-            field(debi, { debi = it }, "Debi m3/saat")
-            field(sayfa, { sayfa = it }, "Sayfa")
-            field(sayfaPdf, { sayfaPdf = it }, "PDF Sayfa")
+            field(fiyat, { fiyat = it }, "Fiyat")
+            field(ozellikler, { ozellikler = it }, "Özellikler")
 
-            item {
-                OutlinedTextField(
-                    value = fiyat,
-                    onValueChange = { fiyat = it },
-                    label = { Text("Fiyat") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            // ✅ Kategoriye özel alanlar
+            when (anaKategori) {
+
+                "Evsel" -> {
+                    field(pompa, { pompa = it }, "Pompa")
+                    field(asama, { asama = it }, "Aşama")
+                    field(membran, { membran = it }, "Membran GPD")
+                    field(tank, { tank = it }, "Tank Galon")
+                }
+
+                "Endüstriyel" -> {
+                    field(sayfa, { sayfa = it }, "Model")
+                    field(debi, { debi = it }, "Debi m³/saat")
+                    field(tankBaglanti, { tankBaglanti = it }, "Tank Bağlantı")
+                    field(girisCikis, { girisCikis = it }, "Giriş / Çıkış")
+                }
+
+                "Peyzaj" -> {
+                    field(sayfa, { sayfa = it }, "Nozul Rengi")
+                    field(sayfaPdf, { sayfaPdf = it }, "Atış Mesafesi")
+                    // Basınç veya diğer peyzaj alanları eklenebilir
+                }
             }
 
             // ✅ Para birimi dropdown
@@ -2767,34 +2738,62 @@ fun AddProductFormScreen(
                 }
             }
 
-            field(ozellikler, { ozellikler = it }, "Özellikler")
-
+            // ✅ Kaydet butonu
             item {
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
+                        val product = when (anaKategori) {
 
-                        val urun = Urun(
-                            anaKategori = anaKategori,
-                            altKategori = altKategori,
-                            urun_adi = urunAdi,
-                            marka = marka,
-                            pompa = pompa,
-                            asama = asama,
-                            membran_gpd = membran.toDoubleOrNull(),
-                            tank_galon = tank.toDoubleOrNull(),
-                            tank_baglanti = tankBaglanti,
-                            giris_cikis_baglanti = girisCikis,
-                            debi_m3_saat = debi.toDoubleOrNull(),
-                            urun_kodu = kod.toIntOrNull(),
-                            fiyat = fiyat.toDoubleOrNull(),
-                            paraBirimi = paraBirimi,
-                            ozellikler = ozellikler
-                        )
+                            "Evsel" -> EvselUrun(
+                                anaKategori = anaKategori,
+                                altKategori = altKategori,
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                pompa = pompa,
+                                asama = asama,
+                                membran_gpd = membran.toDoubleOrNull(),
+                                tank_galon = tank.toDoubleOrNull(),
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi,
+                                ozellikler = ozellikler
+                            )
+
+                            "Endüstriyel" -> EndustriyelUrun(
+                                anaKategori = anaKategori,
+                                altKategori = altKategori,
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                model = sayfa,
+                                debi_m3_saat = debi.toDoubleOrNull(),
+                                tank_baglanti = tankBaglanti,
+                                giris_cikis_baglanti = girisCikis,
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi,
+                                ozellikler = ozellikler
+                            )
+
+                            "Peyzaj" -> PeyzajUrun(
+                                anaKategori = anaKategori,
+                                altKategori = altKategori,
+                                urun_adi = urunAdi,
+                                marka = marka,
+                                nozul_rengi = sayfa,
+                                atis_mesafesi = sayfaPdf,
+                                urun_kodu = kod.toIntOrNull(),
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi,
+                                ozellikler = ozellikler
+                            )
+
+                            else -> return@Button
+                        }
 
                         Firebase.firestore
                             .collection("products")
-                            .add(urun)
+                            .add(product)
 
                         scope.launch {
                             snackbar.showSnackbar("Ürün eklendi ✅")
@@ -2806,6 +2805,7 @@ fun AddProductFormScreen(
                     Text("Kaydet")
                 }
             }
+
         }
     }
 }
@@ -2860,11 +2860,8 @@ fun AddProjectProductFormScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
-            fun field(
-                value: String,
-                onChange: (String) -> Unit,
-                label: String
-            ) {
+            // Basit field fonksiyonu
+            fun field(value: String, onChange: (String) -> Unit, label: String) {
                 item {
                     OutlinedTextField(
                         value = value,
@@ -2897,6 +2894,7 @@ fun AddProjectProductFormScreen(
                 )
             }
 
+            // Para birimi dropdown
             item {
                 ExposedDropdownMenuBox(
                     expanded = expanded,
@@ -2907,9 +2905,7 @@ fun AddProjectProductFormScreen(
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Para Birimi") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
-                        },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                         modifier = Modifier
                             .menuAnchor()
                             .fillMaxWidth()
@@ -2934,6 +2930,7 @@ fun AddProjectProductFormScreen(
 
             field(ozellikler, { ozellikler = it }, "Özellikler")
 
+            // Kaydet butonu
             item {
 
                 Button(
@@ -2950,15 +2947,17 @@ fun AddProjectProductFormScreen(
 
                         loading = true
 
-                        val urun = Urun(
+                        // 🔹 BaseUrun yerine concrete class
+                        val product: BaseUrun = EndustriyelUrun(
                             anaKategori = "Proje",
                             altKategori = projeAdi,
                             urun_adi = urunAdi.trim(),
                             marka = marka.trim(),
-                            pompa = pompa.trim(),
-                            asama = asama.trim(),
-                            membran_gpd = membran.toDoubleOrNull(),
-                            tank_galon = tank.toDoubleOrNull(),
+                            model = "",
+                            //pompa = pompa.trim(),
+                            //asama = asama.trim(),
+                            //membran_gpd = membran.toDoubleOrNull(),
+                            //tank_galon = tank.toDoubleOrNull(),
                             tank_baglanti = tankBaglanti.trim(),
                             giris_cikis_baglanti = girisCikis.trim(),
                             debi_m3_saat = debi.toDoubleOrNull(),
@@ -2972,9 +2971,8 @@ fun AddProjectProductFormScreen(
                             .collection("projects")
                             .document(projeAdi)
                             .collection("urunler")
-                            .add(urun)
+                            .add(product)
                             .addOnSuccessListener {
-
                                 scope.launch {
                                     snackbarHostState.showSnackbar("Ürün projeye eklendi ✅")
                                     delay(800)
@@ -3103,15 +3101,3 @@ fun formatDate(time: Long): String {
     return sdf.format(java.util.Date(time))
 }
 
-fun String.normalizeCategory(): String {
-    return this
-        .trim()
-        .lowercase()
-        .replace("ı", "i")
-        .replace("ş", "s")
-        .replace("ç", "c")
-        .replace("ğ", "g")
-        .replace("ü", "u")
-        .replace("ö", "o")
-        .replaceFirstChar { it.uppercase() }
-}

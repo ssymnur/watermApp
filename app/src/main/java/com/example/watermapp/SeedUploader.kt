@@ -19,34 +19,45 @@ object SeedUploader {
 
             kategori.urunler.forEach { urun ->
 
-                val map = hashMapOf(
+                val map = hashMapOf<String, Any?>(
                     "anaKategori" to anaKategori,
                     "altKategori" to kategori.kategoriAdi,
 
                     "urun_adi" to urun.urun_adi,
-                    "model" to urun.model,
                     "marka" to urun.marka,
-
-                    "pompa" to urun.pompa,
-                    "asama" to urun.asama,
-
-                    "membran_gpd" to urun.membran_gpd,
-                    "tank_galon" to urun.tank_galon,
-
-                    "tank_baglanti" to urun.tank_baglanti,
-                    "giris_cikis_baglanti" to urun.giris_cikis_baglanti,
-                    "debi_m3_saat" to urun.debi_m3_saat,
-
                     "urun_kodu" to urun.urun_kodu,
                     "fiyat" to urun.fiyat,
                     "paraBirimi" to urun.paraBirimi,
-
                     "ozellikler" to urun.ozellikler
                 )
 
+                when (urun) {
+
+                    is EvselUrun -> {
+                        map["pompa"] = urun.pompa
+                        map["asama"] = urun.asama
+                        map["membran_gpd"] = urun.membran_gpd
+                        map["tank_galon"] = urun.tank_galon
+                    }
+
+                    is EndustriyelUrun -> {
+                        map["model"] = urun.model
+                        map["tank_baglanti"] = urun.tank_baglanti
+                        map["giris_cikis_baglanti"] = urun.giris_cikis_baglanti
+                        map["debi_m3_saat"] = urun.debi_m3_saat
+                    }
+
+                    is PeyzajUrun -> {
+                        map["nozul_rengi"] = urun.nozul_rengi
+                        map["atis_mesafesi"] = urun.atis_mesafesi
+                        map["basinc_degeri"] = urun.basinc_degeri
+                        map["ambalaj_adedi"] = urun.ambalaj_adedi
+                        map["kutu_adedi"] = urun.kutu_adedi
+                    }
+                }
 
                 db.collection("products")
-                    .document("${anaKategori}_${urun.urun_kodu}") // çakışmayı önler
+                    .document("${anaKategori}_${urun.urun_kodu}")
                     .set(map)
             }
         }

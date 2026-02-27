@@ -1,75 +1,105 @@
 package com.example.watermapp
 
 import com.google.firebase.Firebase
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.firestore
+import com.google.firebase.firestore.toObject
 
 object ProductRepository {
 
     private val db = Firebase.firestore
 
-    // 🔹 Ürün Güncelle (Hem kategori hem proje için)
+
+    // ✅ Ürün Güncelle
     fun updateProduct(
         productId: String,
-        urun: Urun,
+        urun: BaseUrun,
         projeAdi: String? = null
     ) {
 
-        if (projeAdi == null) {
-            // Normal kategori ürünü
+        val collectionRef = if (projeAdi == null) {
             db.collection("products")
-                .document(productId)
-                .set(urun)
         } else {
-            // Proje içindeki ürün
             db.collection("projects")
                 .document(projeAdi)
                 .collection("urunler")
-                .document(productId)
-                .set(urun)
         }
+
+        collectionRef.document(productId).set(urun)
     }
 
-    // 🔹 Kategori ürünlerini getir
-    fun getProducts(onResult: (List<Urun>) -> Unit) {
 
-        db.collection("products")
-            .get()
-            .addOnSuccessListener { result ->
+    // ⭐ PRODUCTS (LIVE SNAPSHOT LISTENER)
+    fun getProducts(
+        anaKategori: String,
+        altKategori: String,
+        onResult: (List<BaseUrun>) -> Unit
+    ): ListenerRegistration {
 
-                val list = result.documents.mapNotNull { doc ->
+        return db.collection("products")
+            .whereEqualTo("anaKategori", anaKategori)
+            .whereEqualTo("altKategori", altKategori)
+            .addSnapshotListener { snapshot, _ ->
 
-                    val urun = doc.toObject(Urun::class.java)
+                val list = snapshot?.documents?.mapNotNull { doc ->
 
-                    urun?.copy(id = doc.id)
+                    when (doc.getString("anaKategori")) {
 
-                }
+                        "Evsel" ->
+                            doc.toObject(EvselUrun::class.java)
+                                ?.copy(id = doc.id)
+
+                        "Endüstriyel" ->
+                            doc.toObject(EndustriyelUrun::class.java)
+                                ?.copy(id = doc.id)
+
+                        "Peyzaj" ->
+                            doc.toObject(PeyzajUrun::class.java)
+                                ?.copy(id = doc.id)
+
+                        else -> null
+                    }
+
+                } ?: emptyList()
 
                 onResult(list)
             }
     }
 
-    // 🔹 Proje ürünlerini getir
+
+    // ⭐ PROJE ÜRÜNLERİ (LIVE SNAPSHOT)
     fun getProjectProducts(
         projeAdi: String,
-        onResult: (List<Urun>) -> Unit
-    ) {
+        onResult: (List<BaseUrun>) -> Unit
+    ): ListenerRegistration {
 
-        db.collection("projects")
+        return db.collection("projects")
             .document(projeAdi)
             .collection("urunler")
-            .get()
-            .addOnSuccessListener { result ->
+            .addSnapshotListener { snapshot, _ ->
 
-                val list = result.documents.mapNotNull { doc ->
+                val list = snapshot?.documents?.mapNotNull { doc ->
 
-                    val urun = doc.toObject(Urun::class.java)
+                    when (doc.getString("anaKategori")) {
 
-                    urun?.copy(id = doc.id)
+                        "Evsel" ->
+                            doc.toObject(EvselUrun::class.java)
+                                ?.copy(id = doc.id)
 
-                }
+                        "Endüstriyel" ->
+                            doc.toObject(EndustriyelUrun::class.java)
+                                ?.copy(id = doc.id)
+
+                        "Peyzaj" ->
+                            doc.toObject(PeyzajUrun::class.java)
+                                ?.copy(id = doc.id)
+
+                        else -> null
+                    }
+
+                } ?: emptyList()
 
                 onResult(list)
             }
     }
-
 }
