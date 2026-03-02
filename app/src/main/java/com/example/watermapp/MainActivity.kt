@@ -53,6 +53,9 @@ import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 
+//??????????????????????????????????????????????????????????????
+//KDV VE İSKONTO TOPLAM ÜZERİNDEN Mİ ? DOLAR EOURO ÜZERİNDEN Mİ?
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -199,12 +202,18 @@ object CartManager {
     }
 
     fun add(urun: BaseUrun) {
-        val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
+
+        val existing = cart.find { it.urun.id == urun.id }
 
         if (existing != null) {
             existing.quantity.value++
         } else {
-            cart.add(CartItem(urun))
+            cart.add(
+                CartItem(
+                    urun = urun,
+                    quantity = mutableStateOf(1)
+                )
+            )
         }
     }
 
@@ -213,20 +222,23 @@ object CartManager {
     }
 
     fun remove(urun: BaseUrun) {
-        val existing = cart.find { it.urun.urun_adi == urun.urun_adi }
+
+        val existing = cart.find { it.urun.id == urun.id }
 
         if (existing != null) {
-            existing.quantity.value--
 
-            if (existing.quantity.value <= 0) {
+            if (existing.quantity.value > 1) {
+                existing.quantity.value--
+            } else {
                 cart.remove(existing)
             }
         }
     }
 
     fun getQuantity(urun: BaseUrun): Int {
-        return cart.find { it.urun.urun_adi == urun.urun_adi }
-            ?.quantity?.value ?: 0
+        return cart.find { it.urun.id == urun.id }
+            ?.quantity
+            ?.value ?: 0
     }
 
     fun totalPrice(): Double {
@@ -269,19 +281,95 @@ fun AppNavigator(startDestination: String) {
                     .get()
                     .addOnSuccessListener { doc ->
 
-                        urun = when (doc.getString("anaKategori")) {
+                        if (!doc.exists()) return@addOnSuccessListener
 
-                            "Evsel" ->
-                                doc.toObject(EvselUrun::class.java)
-                                    ?.copy(id = doc.id)
+                        val anaKategori = doc.getString("anaKategori")
 
-                            "Endüstriyel" ->
-                                doc.toObject(EndustriyelUrun::class.java)
-                                    ?.copy(id = doc.id)
+                        urun = when (anaKategori) {
 
-                            "Peyzaj" ->
-                                doc.toObject(PeyzajUrun::class.java)
-                                    ?.copy(id = doc.id)
+                            "Evsel" -> {
+                                EvselUrun(
+                                    id = doc.id,
+                                    anaKategori = anaKategori ?: "",
+                                    altKategori = doc.getString("altKategori") ?: "",
+                                    urun_adi = doc.getString("urun_adi") ?: "",
+                                    marka = doc.getString("marka"),
+
+                                    urun_kodu = doc.get("urun_kodu")?.toString(),
+
+                                    fiyat = when (val f = doc.get("fiyat")) {
+                                        is Number -> f.toDouble()
+                                        is String -> f.toDoubleOrNull()
+                                        else -> null
+                                    },
+
+                                    paraBirimi = doc.getString("paraBirimi") ?: "USD",
+                                    ozellikler = doc.getString("ozellikler"),
+
+                                    pompa = doc.getString("pompa"),
+                                    asama = doc.getString("asama"),
+                                    membran_gpd = (doc.get("membran_gpd") as? Number)?.toDouble(),
+                                    tank_galon = (doc.get("tank_galon") as? Number)?.toDouble()
+                                )
+                            }
+
+                            "Endüstriyel" -> {
+                                EndustriyelUrun(
+                                    id = doc.id,
+                                    anaKategori = anaKategori ?: "",
+                                    altKategori = doc.getString("altKategori") ?: "",
+                                    urun_adi = doc.getString("urun_adi") ?: "",
+                                    marka = doc.getString("marka"),
+
+                                    urun_kodu = doc.get("urun_kodu")?.toString(),
+
+                                    fiyat = when (val f = doc.get("fiyat")) {
+                                        is Number -> f.toDouble()
+                                        is String -> f.toDoubleOrNull()
+                                        else -> null
+                                    },
+
+                                    paraBirimi = doc.getString("paraBirimi") ?: "USD",
+                                    ozellikler = doc.getString("ozellikler"),
+
+                                    model = doc.getString("model"),
+                                    tank_baglanti = doc.getString("tank_baglanti"),
+                                    giris_cikis_baglanti = doc.getString("giris_cikis_baglanti"),
+                                    debi_m3_saat = (doc.get("debi_m3_saat") as? Number)?.toDouble()
+                                )
+                            }
+
+                            "Peyzaj" -> {
+                                PeyzajUrun(
+                                    id = doc.id,
+                                    anaKategori = anaKategori ?: "",
+                                    altKategori = doc.getString("altKategori") ?: "",
+                                    urun_adi = doc.getString("urun_adi") ?: "",
+                                    marka = doc.getString("marka"),
+
+                                    urun_kodu = doc.get("urun_kodu")?.toString(),
+
+                                    fiyat = when (val f = doc.get("fiyat")) {
+                                        is Number -> f.toDouble()
+                                        is String -> f.toDoubleOrNull()
+                                        else -> null
+                                    },
+
+                                    paraBirimi = doc.getString("paraBirimi") ?: "USD",
+                                    ozellikler = doc.getString("ozellikler"),
+
+                                    ebat = doc.getString("ebat"),
+                                    istasyon_sayisi = (doc.get("istasyon_sayisi") as? Number)?.toInt(),
+                                    ambalaj_adedi = (doc.get("ambalaj_adedi") as? Number)?.toInt(),
+                                    tip = doc.getString("tip"),
+                                    koli_adedi = (doc.get("koli_adedi") as? Number)?.toInt(),
+                                    kutu_adedi = (doc.get("kutu_adedi") as? Number)?.toInt(),
+                                    nozul_rengi = doc.getString("nozul_rengi"),
+                                    atis_mesafesi = doc.getString("atis_mesafesi"),
+                                    basinc_degeri = doc.getString("basinc_degeri"),
+                                    tanim = doc.getString("tanim")
+                                )
+                            }
 
                             else -> null
                         }
@@ -320,6 +408,23 @@ fun AppNavigator(startDestination: String) {
             EditProjectProductScreen(
                 urunId = urunId,
                 projeAdi = projeAdi,
+                navController = navController
+            )
+        }
+        composable(
+            route = "detail/{ana}/{ust}",
+            arguments = listOf(
+                navArgument("ana") { type = NavType.StringType },
+                navArgument("ust") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val ana = backStackEntry.arguments?.getString("ana") ?: ""
+            val ust = backStackEntry.arguments?.getString("ust")?.fromNavArg()
+
+            DetailScreenCategory(
+                anaKategori = ana,
+                ustKategori = ust,
                 navController = navController
             )
         }
@@ -394,10 +499,13 @@ fun AppNavigator(startDestination: String) {
             )
         ) { backStackEntry ->
 
-            val ana =
-                backStackEntry.arguments?.getString("ana") ?: ""
+            val ana = backStackEntry.arguments?.getString("ana") ?: ""
 
-            DetailScreenCategory(ana, navController)
+            DetailScreenCategory(
+                anaKategori = ana,
+                ustKategori = null,
+                navController = navController
+            )
         }
 
         composable(
@@ -479,7 +587,6 @@ fun AppNavigator(startDestination: String) {
         }
     }
 }
-
 @Composable
 fun LoginScreen(navController: NavHostController) {
     val context = LocalContext.current
@@ -561,12 +668,12 @@ fun CategoryScreen(navController: NavHostController) {
         Triple("Peyzaj", "kategori/Peyzaj", Icons.Default.Park)
     )
 
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
         Text(
             "Kategoriler",
             style = MaterialTheme.typography.headlineMedium
@@ -625,28 +732,66 @@ fun CategoryScreen(navController: NavHostController) {
 @Composable
 fun DetailScreenCategory(
     anaKategori: String,
+    ustKategori: String? = null,
     navController: NavHostController
 ) {
-    Log.d("KATEGORI_DEBUG", "anaKategori = $anaKategori")
 
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    DisposableEffect(anaKategori) {
+    DisposableEffect(anaKategori, ustKategori) {
 
-        if (anaKategori == "Peyzaj") {
+        // 🔹 1️⃣ PEYZAJ ANA KATEGORİ
+        if (anaKategori == "Peyzaj" && ustKategori == null) {
 
-            // 🔥 SABİT ALT KATEGORİLER
             kategoriler = listOf("POELSAN", "RAINBIRD")
 
             onDispose { }
 
-        } else {
+        }
+
+        // 🔹 2️⃣ PEYZAJ → POELSAN ALT KATEGORİLERİ
+        else if (anaKategori == "Peyzaj" && ustKategori == "POELSAN") {
+
+            kategoriler = listOf(
+                "CUP/BT PİLLİ SULAMA KONTROL ÜNİTESİ",
+                "SPREYLER VE NOZULLAR",
+                "ELEKTROFÜZYON VE SPİGOT EK PARÇALARI",
+                "MAVİ SERİ",
+                "YEŞİL SERİ",
+                "PRİZ KOLYE",
+                "PRİZ KOLYE GEÇMELİ",
+                "LAYFLAT EK PARÇALARI",
+                "DİŞLİ BAĞLANTI ELEMANLARI",
+                "KÜRESEL VANALAR",
+                "CAN SUYU VANA",
+                "VANA KUTULARI",
+                "PLASTİK FİLTRE",
+                "MİNİ VANA (DN 8)",
+                "MİNİ VANA (DN 15)",
+                "HAT SONU TAHLİYE VANASI",
+                "KİLİTLİ BAĞLANTI ELEMANLARI",
+                "DAMLA SULAMA KURTAĞZI",
+                "DAMLA SULAMA SOMUNLU",
+                "YASSI DAMLA SULAMA SOMUNLU",
+                "YASSI DAMLA SULAMA YÜZÜKLÜ",
+                "MİNİ SPRİNKLER VE EK PARÇALARI",
+                "HAT ÜSTÜ DAMLATICI"
+            )
+
+            onDispose { }
+
+        }
+
+        // 🔹 3️⃣ DİĞER KATEGORİLER (Firebase’den ÇEK)
+        else {
 
             val listener = FirebaseFirestore.getInstance()
                 .collection("products")
                 .addSnapshotListener { snapshot, _ ->
+
                     kategoriler = snapshot?.documents
                         ?.mapNotNull { doc ->
+
                             val ana = doc.getString("anaKategori")
                                 ?: doc.getString("kategori")
 
@@ -666,7 +811,14 @@ fun DetailScreenCategory(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("$anaKategori Kategorileri") },
+                title = {
+                    Text(
+                        if (ustKategori == null)
+                            "$anaKategori Kategorileri"
+                        else
+                            ustKategori
+                    )
+                },
                 navigationIcon = {
                     IconButton(
                         onClick = { navController.popBackStack() }
@@ -680,7 +832,6 @@ fun DetailScreenCategory(
             )
         },
 
-        // ✅ SADECE SEPET bottom bar’da
         bottomBar = {
             BottomAppBar {
                 Row(
@@ -700,7 +851,6 @@ fun DetailScreenCategory(
             }
         },
 
-        // ✅ PROJE OLUŞTURMA FAB (Sadece Endüstriyel)
         floatingActionButton = {
             if (anaKategori == "Endüstriyel") {
                 FloatingActionButton(
@@ -717,6 +867,7 @@ fun DetailScreenCategory(
         },
 
         floatingActionButtonPosition = FabPosition.End
+
     ) { padding ->
 
         LazyColumn(
@@ -726,6 +877,7 @@ fun DetailScreenCategory(
                 .padding(16.dp)
         ) {
             items(kategoriler) { kategori ->
+
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     elevation = CardDefaults.cardElevation(6.dp),
@@ -733,9 +885,20 @@ fun DetailScreenCategory(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
                         .clickable {
-                            navController.navigate(
-                                "urunler/$anaKategori/${kategori.toNavArg()}"
-                            )
+
+                            // 🔥 Eğer Peyzaj ana ekrandaysak → üst kategoriye git
+                            if (anaKategori == "Peyzaj" && ustKategori == null) {
+
+                                navController.navigate(
+                                    "detail/$anaKategori/${kategori.toNavArg()}"
+                                )
+
+                            } else {
+
+                                navController.navigate(
+                                    "urunler/$anaKategori/${kategori.toNavArg()}"
+                                )
+                            }
                         }
                 ) {
                     Text(
@@ -789,7 +952,9 @@ fun DetailScreenProducts(
     navController: NavHostController
 ) {
 
-    var urunler by remember { mutableStateOf<List<BaseUrun>>(emptyList()) }
+    var urunler by remember {
+        mutableStateOf<List<PeyzajUrun>>(emptyList())
+    }
 
     // 🔥 FIREBASE CANLI LİSTE (SEALED CLASS UYUMLU)
     DisposableEffect(anaKategori, kategoriAdi) {
@@ -802,20 +967,9 @@ fun DetailScreenProducts(
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
 
-                    when (anaKategori) {
-
-                        "Evsel" ->
-                            doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
-
-                        "Endüstriyel" ->
-                            doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
-
-                        "Peyzaj" ->
-                            doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
-
-                        else -> null
-                    }
-
+                    doc.toObject(PeyzajUrun::class.java)?.copy(
+                        id = doc.id
+                    )
                 } ?: emptyList()
             }
 
@@ -893,7 +1047,9 @@ fun DetailScreenProducts(
 
                             Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
 
-                            urun.marka?.let { Text("Marka: $it") }
+                            urun.marka
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { Text("Marka: $it") }
                             urun.urun_kodu?.let { Text("Kod: $it") }
 
                             // 🔥 KATEGORİYE GÖRE TÜM ÖZELLİKLER
@@ -915,11 +1071,46 @@ fun DetailScreenProducts(
                                 }
 
                                 is PeyzajUrun -> {
-                                    urun.nozul_rengi?.let { Text("Nozul: $it") }
-                                    urun.atis_mesafesi?.let { Text("Atış: $it") }
-                                    urun.basinc_degeri?.let { Text("Basınç: $it") }
-                                    urun.ambalaj_adedi?.let { Text("Ambalaj: $it") }
-                                    urun.kutu_adedi?.let { Text("Kutu: $it") }
+
+                                    urun.ebat?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Ebat: $it")
+                                    }
+
+                                    urun.istasyon_sayisi?.let {
+                                        Text("İstasyon Sayısı: $it")
+                                    }
+
+                                    urun.ambalaj_adedi?.let {
+                                        Text("Ambalaj Adedi: $it")
+                                    }
+
+                                    urun.tip?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Tip: $it")
+                                    }
+
+                                    urun.koli_adedi?.let {
+                                        Text("Koli Adedi: $it")
+                                    }
+
+                                    urun.kutu_adedi?.let {
+                                        Text("Kutu Adedi: $it")
+                                    }
+
+                                    urun.nozul_rengi?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Nozul: $it")
+                                    }
+
+                                    urun.atis_mesafesi?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Atış: $it")
+                                    }
+
+                                    urun.basinc_degeri?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Basınç: $it")
+                                    }
+
+                                    urun.tanim?.takeIf { it.isNotBlank() }?.let {
+                                        Text("Tanım: $it")
+                                    }
                                 }
                             }
 
@@ -1507,15 +1698,7 @@ fun ProjeDetayScreen(
                 }
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
-
-                    when (doc.getString("anaKategori")) {
-
-                        "Evsel" -> doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
-                        "Endüstriyel" -> doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
-                        "Peyzaj" -> doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
-                        else -> null
-                    }
-
+                    doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
                 } ?: emptyList()
 
                 isLoading = false
@@ -1647,7 +1830,18 @@ fun ProjeDetayScreen(
                                     }
 
                                     Text("Marka: ${urun.marka ?: "-"}")
-                                    Text("Kod: ${urun.urun_kodu ?: "-"}")
+
+                                    Text(
+                                        "Kod: ${
+                                            when (urun) {
+                                                is EvselUrun -> urun.urun_kodu?.toString() ?: "-"
+                                                is EndustriyelUrun -> urun.urun_kodu?.toString() ?: "-"
+                                                is PeyzajUrun -> urun.urun_kodu?.toString() ?: "-"
+                                                else -> "-"
+                                            }
+                                        }"
+                                    )
+
                                     Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi}")
                                     Text("Özellikler: ${urun.ozellikler ?: "-"}")
 
@@ -1891,7 +2085,16 @@ fun EditProductScreen(
 
     var urunAdi by rememberSaveable { mutableStateOf(urun.urun_adi) }
     var marka by rememberSaveable { mutableStateOf(urun.marka ?: "") }
-    var kod by rememberSaveable { mutableStateOf(urun.urun_kodu?.toString() ?: "") }
+    var kod by rememberSaveable {
+        mutableStateOf(
+            when (urun) {
+                is EvselUrun -> urun.urun_kodu?.toString() ?: ""
+                is EndustriyelUrun -> urun.urun_kodu?.toString() ?: ""
+                is PeyzajUrun -> urun.urun_kodu?.toString() ?: ""
+                else -> ""
+            }
+        )
+    }
     var fiyat by rememberSaveable { mutableStateOf(urun.fiyat?.toString() ?: "") }
     var paraBirimi by rememberSaveable { mutableStateOf(urun.paraBirimi) }
 
@@ -1915,6 +2118,13 @@ fun EditProductScreen(
     var nozul by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.nozul_rengi ?: "") }
     var atis by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.atis_mesafesi ?: "") }
     var basinc by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.basinc_degeri ?: "") }
+    var ebat by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.ebat ?: "") }
+    var istasyon by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.istasyon_sayisi?.toString() ?: "") }
+    var ambalaj by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.ambalaj_adedi?.toString() ?: "") }
+    var tip by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.tip ?: "") }
+    var koli by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.koli_adedi?.toString() ?: "") }
+    var kutu by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.kutu_adedi?.toString() ?: "") }
+    var tanim by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.tanim ?: "") }
 
     Scaffold(
         topBar = {
@@ -1967,6 +2177,15 @@ fun EditProductScreen(
                     item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
                     item { OutlinedTextField(atis, { atis = it }, label = { Text("Atış Mesafesi") }) }
                     item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
+                    item { OutlinedTextField(ebat, { ebat = it }, label = { Text("Ebat") }) }
+                    item { OutlinedTextField(istasyon, { istasyon = it }, label = { Text("İstasyon Sayısı") }) }
+                    item { OutlinedTextField(ambalaj, { ambalaj = it }, label = { Text("Ambalaj Adedi") }) }
+                    item { OutlinedTextField(tip, { tip = it }, label = { Text("Tip") }) }
+                    item { OutlinedTextField(koli, { koli = it }, label = { Text("Koli Adedi") }) }
+                    item { OutlinedTextField(kutu, { kutu = it }, label = { Text("Kutu Adedi") }) }
+                    item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
+                    item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
+                    item { OutlinedTextField(tanim, { tanim = it }, label = { Text("Tanım") }) }
                 }
             }
 
@@ -2023,7 +2242,7 @@ fun EditProductScreen(
                                 asama = asama,
                                 membran_gpd = membran.toDoubleOrNull(),
                                 tank_galon = tank.toDoubleOrNull(),
-                                urun_kodu = kod.toIntOrNull(),
+                                urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi
                             )
@@ -2033,7 +2252,7 @@ fun EditProductScreen(
                                 marka = marka,
                                 model = model,
                                 debi_m3_saat = debi.toDoubleOrNull(),
-                                urun_kodu = kod.toIntOrNull(),
+                                urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi
                             )
@@ -2041,10 +2260,17 @@ fun EditProductScreen(
                             is PeyzajUrun -> urun.copy(
                                 urun_adi = urunAdi,
                                 marka = marka,
+                                ebat = ebat,
+                                istasyon_sayisi = istasyon.toIntOrNull(),
+                                ambalaj_adedi = ambalaj.toIntOrNull(),
+                                tip = tip,
+                                koli_adedi = koli.toIntOrNull(),
+                                kutu_adedi = kutu.toIntOrNull(),
                                 nozul_rengi = nozul,
                                 atis_mesafesi = atis,
                                 basinc_degeri = basinc,
-                                urun_kodu = kod.toIntOrNull(),
+                                tanim = tanim,
+                                urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi
                             )
@@ -2611,6 +2837,8 @@ fun AddProductFormScreen(
     anaKategori: String,
     altKategori: String
 ) {
+    //FİYAT
+
     var urunAdi by rememberSaveable { mutableStateOf("") }
     var marka by rememberSaveable { mutableStateOf("") }
     var pompa by rememberSaveable { mutableStateOf("") }
@@ -2633,6 +2861,16 @@ fun AddProductFormScreen(
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    //PEYZAJ ALANLAR
+    var ebat by rememberSaveable { mutableStateOf("") }
+    var istasyonSayisi by rememberSaveable { mutableStateOf("") }
+    var ambalajAdedi by rememberSaveable { mutableStateOf("") }
+    var tip by rememberSaveable { mutableStateOf("") }
+    var koliAdedi by rememberSaveable { mutableStateOf("") }
+    var tanim by rememberSaveable { mutableStateOf("") }
+    var kutuAdedi by rememberSaveable { mutableStateOf("") }
+    var basincDegeri by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -2673,7 +2911,6 @@ fun AddProductFormScreen(
 
             // ✅ Ortak alanlar: ürün adı, marka, ürün kodu, fiyat, özellikler
             field(urunAdi, { urunAdi = it }, "Ürün Adı")
-            field(marka, { marka = it }, "Marka")
             field(kod, { kod = it }, "Ürün Kodu")
             field(fiyat, { fiyat = it }, "Fiyat")
             field(ozellikler, { ozellikler = it }, "Özellikler")
@@ -2686,6 +2923,7 @@ fun AddProductFormScreen(
                     field(asama, { asama = it }, "Aşama")
                     field(membran, { membran = it }, "Membran GPD")
                     field(tank, { tank = it }, "Tank Galon")
+                    field(marka, { marka = it }, "Marka")
                 }
 
                 "Endüstriyel" -> {
@@ -2693,12 +2931,21 @@ fun AddProductFormScreen(
                     field(debi, { debi = it }, "Debi m³/saat")
                     field(tankBaglanti, { tankBaglanti = it }, "Tank Bağlantı")
                     field(girisCikis, { girisCikis = it }, "Giriş / Çıkış")
+                    field(marka, { marka = it }, "Marka")
                 }
 
                 "Peyzaj" -> {
                     field(sayfa, { sayfa = it }, "Nozul Rengi")
                     field(sayfaPdf, { sayfaPdf = it }, "Atış Mesafesi")
-                    // Basınç veya diğer peyzaj alanları eklenebilir
+                    field(ebat, { ebat = it }, "Ebat")
+                    field(istasyonSayisi, { istasyonSayisi = it }, "İstasyon Sayısı")
+                    field(ambalajAdedi, { ambalajAdedi = it }, "Ambalaj Adedi")
+                    field(tip, { tip = it }, "Tip")
+                    field(koliAdedi, { koliAdedi = it }, "Koli Adedi")
+                    field(kutuAdedi, { kutuAdedi = it }, "Kutu Adedi")
+                    field(basincDegeri, { basincDegeri = it }, "Basınç Değeri")
+                    field(tanim, { tanim = it }, "Tanım")
+
                 }
             }
 
@@ -2754,7 +3001,7 @@ fun AddProductFormScreen(
                                 asama = asama,
                                 membran_gpd = membran.toDoubleOrNull(),
                                 tank_galon = tank.toDoubleOrNull(),
-                                urun_kodu = kod.toIntOrNull(),
+                                urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi,
                                 ozellikler = ozellikler
@@ -2769,7 +3016,7 @@ fun AddProductFormScreen(
                                 debi_m3_saat = debi.toDoubleOrNull(),
                                 tank_baglanti = tankBaglanti,
                                 giris_cikis_baglanti = girisCikis,
-                                urun_kodu = kod.toIntOrNull(),
+                                urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi,
                                 ozellikler = ozellikler
@@ -2780,9 +3027,17 @@ fun AddProductFormScreen(
                                 altKategori = altKategori,
                                 urun_adi = urunAdi,
                                 marka = marka,
+                                urun_kodu = kod.ifBlank { null },
+                                ebat = ebat,
+                                istasyon_sayisi = istasyonSayisi.toIntOrNull(),
+                                ambalaj_adedi = ambalajAdedi.toIntOrNull(),
+                                tip = tip,
+                                koli_adedi = koliAdedi.toIntOrNull(),
+                                kutu_adedi = kutuAdedi.toIntOrNull(),
                                 nozul_rengi = sayfa,
                                 atis_mesafesi = sayfaPdf,
-                                urun_kodu = kod.toIntOrNull(),
+                                basinc_degeri = basincDegeri,
+                                tanim = tanim,
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi,
                                 ozellikler = ozellikler
@@ -2961,7 +3216,7 @@ fun AddProjectProductFormScreen(
                             tank_baglanti = tankBaglanti.trim(),
                             giris_cikis_baglanti = girisCikis.trim(),
                             debi_m3_saat = debi.toDoubleOrNull(),
-                            urun_kodu = kod.toIntOrNull(),
+                            urun_kodu = kod.ifBlank { null },
                             fiyat = fiyat.toDoubleOrNull(),
                             paraBirimi = paraBirimi,
                             ozellikler = ozellikler.trim()
@@ -3100,4 +3355,3 @@ fun formatDate(time: Long): String {
     val sdf = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(time))
 }
-
