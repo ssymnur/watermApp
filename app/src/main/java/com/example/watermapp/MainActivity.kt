@@ -1,5 +1,6 @@
 package com.example.watermapp
 
+import android.R.attr.order
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -50,11 +51,17 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import com.example.watermapp.ui.theme.WaterAppTheme
+import com.example.watermapp.utils.toTL
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.Locale
 
 //??????????????????????????????????????????????????????????????
 //KDV VE İSKONTO TOPLAM ÜZERİNDEN Mİ ? DOLAR EOURO ÜZERİNDEN Mİ?
+//cihaz adı ekledim
+//KDV %20
+//proje kısmı endüstriyel ürünler için(ekleme yapılacak mı sor)
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,6 +109,14 @@ object LoginPrefs {
         prefs.edit().clear().apply()
     }
 }
+data class OrderItemDetail(
+    val model: String,
+    val currency: String,
+    val originalPrice: Double,
+    val priceTL: Double,
+    val quantity: Int,
+    val totalTL: Double
+)
 data class Customer(
     val customerName: String = "",
     val companyName: String = "",
@@ -123,11 +138,21 @@ data class OrderItem(
 data class Order(
     val customer: Customer = Customer(),
     val items: List<OrderItem> = emptyList(),
-    val baseTotals: Map<String, Double> = emptyMap(),      // iskonto öncesi
-    val discountedTotals: Map<String, Double> = emptyMap(), // iskonto sonrası
-    val discountPercent: Double = 0.0, // % iskonto
-    val totalTL: Double = 0.0,
-    val timestamp: Long = System.currentTimeMillis()
+
+    val discountPercent: Double = 0.0,
+    val kdvPercent: Double = 20.0,
+
+    val baseTotalTL: Double = 0.0,
+    val discountedTotalTL: Double = 0.0,
+    val kdvAmountTL: Double = 0.0,
+    val grandTotalTL: Double = 0.0,
+
+    val usdRate: Double = 0.0,
+    val eurRate: Double = 0.0,
+
+    val timestamp: Long = System.currentTimeMillis(),
+
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 data class CartItem(
@@ -150,6 +175,25 @@ object CartManager {
     }
 
     var discountPercent by mutableStateOf(0.0)
+
+    fun rawTotalTL(): Double {
+
+        return cart.sumOf { item ->
+
+            val price = item.urun.fiyat ?: 0.0
+            val qty = item.quantity.value
+
+            val tlPrice = when (item.urun.paraBirimi) {
+
+                "USD" -> price * usdRate
+                "EUR" -> price * eurRate
+                "TL" -> price
+                else -> price
+            }
+
+            tlPrice * qty
+        }
+    }
 
     fun totalsByCurrency(): Map<String, Double> {
 
@@ -179,26 +223,19 @@ object CartManager {
 
     fun totalInTL(): Double {
 
-        val rawTotal = cart.sumOf { item ->
+        val baseTL = rawTotalTL()
 
-            val price = item.urun.fiyat ?: 0.0
-            val qty = item.quantity.value
+        // ✅ Önce iskonto
+        val afterDiscount = baseTL * (1 - appliedDiscountPercent / 100)
 
-            when (item.urun.paraBirimi) {
-                "USD" -> price * usdRate * qty
-                "EUR" -> price * eurRate * qty
-                "TL" -> price * qty
-                else -> 0.0
-            }
-        }
+        // ✅ Sonra KDV
+        val finalTotal =
+            if (kdvEnabled)
+                afterDiscount * (1 + kdvRate)
+            else
+                afterDiscount
 
-        var total = rawTotal * (1 - appliedDiscountPercent / 100)
-
-        if (kdvEnabled) {
-            total *= (1 + kdvRate)
-        }
-
-        return total
+        return finalTotal
     }
 
     fun add(urun: BaseUrun) {
@@ -953,7 +990,7 @@ fun DetailScreenProducts(
 ) {
 
     var urunler by remember {
-        mutableStateOf<List<PeyzajUrun>>(emptyList())
+        mutableStateOf<List<BaseUrun>>(emptyList())
     }
 
     // 🔥 FIREBASE CANLI LİSTE (SEALED CLASS UYUMLU)
@@ -967,9 +1004,20 @@ fun DetailScreenProducts(
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
 
-                    doc.toObject(PeyzajUrun::class.java)?.copy(
-                        id = doc.id
-                    )
+                    when (doc.getString("anaKategori")) {
+
+                        "Evsel" ->
+                            doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
+
+                        "Endüstriyel" ->
+                            doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
+
+                        "Peyzaj" ->
+                            doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
+
+                        else -> null
+                    }
+
                 } ?: emptyList()
             }
 
@@ -1402,38 +1450,50 @@ fun CartScreen(navController: NavHostController) {
             Spacer(Modifier.height(12.dp))
 
             // ✅ TOPLAMLAR
+            val totals = CartManager.totalsByCurrency()
 
-            CartManager.totalsByCurrency().forEach { (currency, baseTotal) ->
+            totals.forEach { (currency, baseTotal) ->
 
-                val discounted =
-                    CartManager.totalsWithDiscount()[currency] ?: baseTotal
+                // TL karşılığı
+                val tlValue = when (currency) {
+                    "USD" -> baseTotal * CartManager.usdRate
+                    "EUR" -> baseTotal * CartManager.eurRate
+                    "TL" -> baseTotal
+                    else -> baseTotal
+                }
+
+                // TL'ye iskonto uygula
+                val afterDiscount =
+                    tlValue * (1 - CartManager.appliedDiscountPercent / 100)
+
+                // TL'ye KDV uygula
+                val finalTL =
+                    if (CartManager.kdvEnabled)
+                        afterDiscount * (1 + CartManager.kdvRate)
+                    else
+                        afterDiscount
 
                 Column {
 
-                    // 👉 indirimsiz (silik)
-                    if (baseTotal != discounted) {
-                        Text(
-                            text = when (currency) {
-                                "USD" -> "USD: %.2f $".format(baseTotal)
-                                "EUR" -> "EUR: %.2f €".format(baseTotal)
-                                "TL" -> "TL: %.2f ₺".format(baseTotal)
-                                else -> "$currency: $baseTotal"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
-                        )
-                    }
+                    // 🔹 ÜSTTE GRİ TL (iskontolu + KDV'li)
+                    Text(
+                        text = "≈ %.2f ₺".format(finalTL),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
 
-                    // 👉 indirimli (ana fiyat)
+                    // 🔹 ALTTA DÖVİZ (DEĞİŞMEZ)
                     Text(
                         text = when (currency) {
-                            "USD" -> "Toplam: %.2f $".format(discounted)
-                            "EUR" -> "Toplam: %.2f €".format(discounted)
-                            "TL" -> "Toplam: %.2f ₺".format(discounted)
-                            else -> "$currency: $discounted"
+                            "USD" -> "%.2f $".format(baseTotal)
+                            "EUR" -> "%.2f €".format(baseTotal)
+                            "TL" -> "%.2f ₺".format(baseTotal)
+                            else -> "$baseTotal"
                         },
                         style = MaterialTheme.typography.headlineSmall
                     )
+
+                    Spacer(Modifier.height(8.dp))
                 }
             }
 
@@ -1448,10 +1508,10 @@ fun CartScreen(navController: NavHostController) {
                 color = Color(0xFF2E7D32)
             )
 
+
         }
     }
 }
-
 @Composable
 fun SimplePage(title: String) {
     Box(
@@ -1919,10 +1979,6 @@ fun EditProjectProductScreen(
     var fiyat by remember { mutableStateOf("") }
     var marka by remember { mutableStateOf("") }
     var paraBirimi by remember { mutableStateOf("") }
-    var pompa by remember { mutableStateOf("") }
-    var asama by remember { mutableStateOf("") }
-    var membranGpd by remember { mutableStateOf("") }
-    var tankGalon by remember { mutableStateOf("") }
     var model by remember { mutableStateOf("") }
     var tankBaglanti by remember { mutableStateOf("") }
     var girisCikis by remember { mutableStateOf("") }
@@ -1948,15 +2004,6 @@ fun EditProjectProductScreen(
 
                 marka = doc.getString("marka") ?: ""
                 paraBirimi = doc.getString("paraBirimi") ?: ""
-                pompa = doc.getString("pompa") ?: ""
-                asama = doc.getString("asama") ?: ""
-
-                membranGpd =
-                    getFirestoreValueAsString(doc, "membran_gpd")
-
-                tankGalon =
-                    getFirestoreValueAsString(doc, "tank_galon")
-
                 debi =
                     getFirestoreValueAsString(doc, "debi_m3_saat")
 
@@ -2007,10 +2054,6 @@ fun EditProjectProductScreen(
                 FormField("Fiyat", fiyat) { fiyat = it }
                 FormField("Marka", marka) { marka = it }
                 FormField("Para Birimi", paraBirimi) { paraBirimi = it }
-                FormField("Pompa", pompa) { pompa = it }
-                FormField("Aşama", asama) { asama = it }
-                FormField("Membran GPD", membranGpd) { membranGpd = it }
-                FormField("Tank Galon", tankGalon) { tankGalon = it }
                 FormField("Model", model) { model = it }
                 FormField("Tank Bağlantı", tankBaglanti) { tankBaglanti = it }
                 FormField("Giriş/Çıkış", girisCikis) { girisCikis = it }
@@ -2028,10 +2071,6 @@ fun EditProjectProductScreen(
                             "fiyat" to fiyat.toDoubleOrNull(),
                             "marka" to marka,
                             "paraBirimi" to paraBirimi,
-                            "pompa" to pompa,
-                            "asama" to asama,
-                            "membran_gpd" to membranGpd.toDoubleOrNull(),
-                            "tank_galon" to tankGalon.toDoubleOrNull(),
                             "model" to model,
                             "tank_baglanti" to tankBaglanti,
                             "giris_cikis_baglanti" to girisCikis,
@@ -2344,9 +2383,25 @@ fun CustomerFormScreen(navController: NavHostController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val totalTL by remember {
-        derivedStateOf { CartManager.totalInTL() }
+    val previewOrder = remember {
+        OrderCalculator.calculateOrder(
+            customer = Customer(),
+            items = CartManager.cart.map {
+                OrderItem(
+                    model = it.urun.urun_adi,
+                    quantity = it.quantity.value,
+                    price = it.urun.fiyat ?: 0.0,
+                    currency = it.urun.paraBirimi ?: "USD"
+                )
+            },
+            discountPercent = CartManager.appliedDiscountPercent,
+            kdvPercent = 20.0,
+            usdRate = CartManager.usdRate,
+            eurRate = CartManager.eurRate
+        )
     }
+
+    val totalTL = previewOrder.grandTotalTL
 
     Scaffold(
 
@@ -2369,7 +2424,6 @@ fun CustomerFormScreen(navController: NavHostController) {
                         .padding(8.dp),
                     onClick = {
 
-                        // ✅ müşteri oluştur
                         val customer = Customer(
                             customerName = customerName,
                             companyName = companyName,
@@ -2379,10 +2433,8 @@ fun CustomerFormScreen(navController: NavHostController) {
                             staffName = staffName,
                             note = note,
                             address = address
-
                         )
 
-                        // ✅ sepet ürünlerini al
                         val items = CartManager.cart.map {
                             OrderItem(
                                 model = it.urun.urun_adi,
@@ -2392,21 +2444,15 @@ fun CustomerFormScreen(navController: NavHostController) {
                             )
                         }
 
-                        // ✅ sipariş oluştur
-                        val baseTotals = CartManager.totalsByCurrency()
-                        val discountedTotals = CartManager.totalsWithDiscount()
-
-                        val order = Order(
+                        val order = OrderCalculator.calculateOrder(
                             customer = customer,
                             items = items,
-                            baseTotals = baseTotals,
-                            discountedTotals = discountedTotals,
                             discountPercent = CartManager.appliedDiscountPercent,
-                            totalTL = totalTL
-
+                            kdvPercent = 20.0,
+                            usdRate = CartManager.usdRate,
+                            eurRate = CartManager.eurRate
                         )
 
-                        // ✅ firebase kaydet
                         saveOrderToFirebase(order)
 
                         scope.launch {
@@ -2549,13 +2595,15 @@ fun OrdersScreen(navController: NavHostController) {
     var search by remember { mutableStateOf("") }
     var orders by remember { mutableStateOf<List<OrderDoc>>(emptyList()) }
 
-    // 👉 silme için dialog state
     var showDeleteDialog by remember { mutableStateOf(false) }
     var orderToDelete by remember { mutableStateOf<OrderDoc?>(null) }
 
     DisposableEffect(Unit) {
-        val listener = Firebase.firestore.collection("orders")
+
+        val listener = Firebase.firestore
+            .collection("orders")
             .addSnapshotListener { snapshot, _ ->
+
                 orders = snapshot?.documents?.mapNotNull { doc ->
                     doc.toObject(Order::class.java)?.let {
                         OrderDoc(doc.id, it)
@@ -2571,14 +2619,16 @@ fun OrdersScreen(navController: NavHostController) {
                 it.order.customer.companyName.contains(search, true)
     }
 
-    // ✅ SİLME ONAY DİYALOĞU
+    // DELETE DIALOG
     if (showDeleteDialog && orderToDelete != null) {
+
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Silme Onayı") },
-            text = { Text("Bu siparişi silmek istediğine emin misin?") },
+            text = { Text("Siparişi silmek istiyor musun?") },
             confirmButton = {
                 TextButton(onClick = {
+
                     Firebase.firestore
                         .collection("orders")
                         .document(orderToDelete!!.id)
@@ -2587,7 +2637,7 @@ fun OrdersScreen(navController: NavHostController) {
                     showDeleteDialog = false
                     orderToDelete = null
                 }) {
-                    Text("Evet, Sil")
+                    Text("Evet")
                 }
             },
             dismissButton = {
@@ -2595,7 +2645,7 @@ fun OrdersScreen(navController: NavHostController) {
                     showDeleteDialog = false
                     orderToDelete = null
                 }) {
-                    Text("Vazgeç")
+                    Text("İptal")
                 }
             }
         )
@@ -2604,10 +2654,10 @@ fun OrdersScreen(navController: NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Müşteri Kayıtları") },
+                title = { Text("Siparişler") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 }
             )
@@ -2624,81 +2674,92 @@ fun OrdersScreen(navController: NavHostController) {
             OutlinedTextField(
                 value = search,
                 onValueChange = { search = it },
-                label = { Text("Müşteri / Şirket ara") },
+                label = { Text("Müşteri / Şirket Ara") },
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
 
-            LazyColumn {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
                 items(filtered) { orderDoc ->
 
                     val order = orderDoc.order
 
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(Modifier.padding(12.dp)) {
+
+                        Column(Modifier.padding(16.dp)) {
 
                             Text("Müşteri: ${order.customer.customerName}")
                             Text("Şirket: ${order.customer.companyName}")
                             Text("Telefon: ${order.customer.phone}")
-                            Text("Cihaz: ${order.customer.deviceName}")
                             Text("Personel: ${order.customer.staffName}")
-                            Text("Adres: ${order.customer.address}")
-                            Text("Not: ${order.customer.note}")
                             Text("Tarih: ${formatDate(order.timestamp)}")
-
-                            Spacer(Modifier.height(6.dp))
-
-                            order.items.forEach {
-                                Text("- ${it.model} x${it.quantity}")
-                            }
-
-                            Text("İskonto: %${order.discountPercent}")
-
-                            order.baseTotals.forEach { (currency, base) ->
-
-                                val discounted = order.discountedTotals[currency] ?: base
-                                val diff = base - discounted
-
-                                Column {
-
-                                    // normal fiyat
-                                    Text(
-                                        "$currency Normal: %.2f".format(base),
-                                        color = Color.Gray
-                                    )
-
-                                    // indirimli fiyat
-                                    Text(
-                                        "$currency İndirimli: %.2f".format(discounted),
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-
-                                    // iskonto miktarı
-                                    if (diff > 0) {
-                                        Text(
-                                            "$currency İskonto: %.2f".format(diff),
-                                            color = Color(0xFF2E7D32) // yeşil
-                                        )
-                                    }
-                                }
-                            }
 
                             Spacer(Modifier.height(8.dp))
 
+                            // ÜRÜN LİSTESİ
+                            order.items.forEach { item ->
+
+                                val tlPrice = when (item.currency) {
+                                    "USD" -> item.price * order.usdRate
+                                    "EUR" -> item.price * order.eurRate
+                                    else -> item.price
+                                }
+
+                                val totalItemTL = tlPrice * item.quantity
+
+                                Text("${item.model} x${item.quantity}")
+
+                                Text(
+                                    "Birim TL: %.2f ₺".format(tlPrice),
+                                    color = Color.Gray
+                                )
+
+                                Text(
+                                    "Satır Toplam: %.2f ₺".format(totalItemTL),
+                                    color = Color.Blue
+                                )
+
+                                Spacer(Modifier.height(6.dp))
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            // FİYAT ÖZETİ
                             Text(
-                                "Genel Toplam (TL): %.2f ₺".format(order.totalTL),
+                                "Ara Toplam: %.2f ₺".format(order.baseTotalTL),
+                                color = Color.Gray
+                            )
+
+                            val discountAmount =
+                                order.baseTotalTL - order.discountedTotalTL
+
+                            Text(
+                                text = "İskonto (%${order.discountPercent}) : -${"%.2f".format(discountAmount)} ₺",
+                                color = Color.Gray
+                            )
+
+                            Text(
+                                text = "KDV (%${order.kdvPercent}) : ${"%.2f".format(order.kdvAmountTL)} ₺",
+                                color = Color.Blue
+                            )
+
+                            Spacer(Modifier.height(6.dp))
+
+                            Text(
+                                "Genel Toplam : %.2f ₺"
+                                    .format(order.grandTotalTL),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color(0xFF2E7D32)
                             )
 
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(12.dp))
 
-                            // ✅ SİL BUTONU
                             Button(
                                 onClick = {
                                     orderToDelete = orderDoc
@@ -3073,10 +3134,6 @@ fun AddProjectProductFormScreen(
 
     var urunAdi by rememberSaveable { mutableStateOf("") }
     var marka by rememberSaveable { mutableStateOf("") }
-    var pompa by rememberSaveable { mutableStateOf("") }
-    var asama by rememberSaveable { mutableStateOf("") }
-    var membran by rememberSaveable { mutableStateOf("") }
-    var tank by rememberSaveable { mutableStateOf("") }
     var kod by rememberSaveable { mutableStateOf("") }
     var fiyat by rememberSaveable { mutableStateOf("") }
     var ozellikler by rememberSaveable { mutableStateOf("") }
@@ -3130,10 +3187,6 @@ fun AddProjectProductFormScreen(
 
             field(urunAdi, { urunAdi = it }, "Ürün Adı")
             field(marka, { marka = it }, "Marka")
-            field(pompa, { pompa = it }, "Pompa")
-            field(asama, { asama = it }, "Aşama")
-            field(membran, { membran = it }, "Membran (GPD)")
-            field(tank, { tank = it }, "Tank (Galon)")
             field(kod, { kod = it }, "Ürün Kodu")
             field(tankBaglanti, { tankBaglanti = it }, "Tank Bağlantı")
             field(girisCikis, { girisCikis = it }, "Giriş / Çıkış")
@@ -3209,10 +3262,6 @@ fun AddProjectProductFormScreen(
                             urun_adi = urunAdi.trim(),
                             marka = marka.trim(),
                             model = "",
-                            //pompa = pompa.trim(),
-                            //asama = asama.trim(),
-                            //membran_gpd = membran.toDoubleOrNull(),
-                            //tank_galon = tank.toDoubleOrNull(),
                             tank_baglanti = tankBaglanti.trim(),
                             giris_cikis_baglanti = girisCikis.trim(),
                             debi_m3_saat = debi.toDoubleOrNull(),
@@ -3271,48 +3320,56 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
             }
     }
 
-    val currentOrder = order
-
-    if (currentOrder == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
+    val currentOrder = order ?: return Box(
+        Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator()
     }
 
     var name by remember { mutableStateOf(currentOrder.customer.customerName) }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
 
         item {
+
+            Text("İskonto: %${currentOrder.discountPercent}")
+
+            Spacer(Modifier.height(8.dp))
+
             Text(
-                "İskonto: %${currentOrder.discountPercent}",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-
-        items(currentOrder.baseTotals.toList()) { (currency, base) ->
-
-            val discounted = currentOrder.discountedTotals[currency] ?: base
-            val diff = base - discounted
-
-            Column {
-                Text(
-                    "$currency Normal: %.2f".format(base),
-                    color = Color.Gray
+                "Ara Toplam: %.2f ₺".format(
+                    Locale.getDefault(),
+                    currentOrder.baseTotalTL
                 )
-                Text("$currency İndirimli: %.2f".format(discounted))
-                Text("$currency İskonto: %.2f".format(diff))
-            }
-        }
+            )
 
-        item {
-            Spacer(Modifier.height(12.dp))
+            val discountAmount =
+                currentOrder.baseTotalTL - currentOrder.discountedTotalTL
+
+            Text(
+                "İskonto (%${currentOrder.discountPercent}) : -%.2f ₺"
+                    .format(Locale.getDefault(), discountAmount),
+                color = Color(0xFF2E7D32)
+            )
+
+            Text(
+                "KDV (%${currentOrder.kdvPercent}) : %.2f ₺"
+                    .format(Locale.getDefault(), currentOrder.kdvAmountTL),
+                color = Color.Blue
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                "Genel Toplam: %.2f ₺"
+                    .format(Locale.getDefault(), currentOrder.grandTotalTL),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color(0xFF2E7D32)
+            )
         }
 
         item {
@@ -3325,6 +3382,7 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
         }
 
         item {
+
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
@@ -3335,7 +3393,8 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
                         )
                     )
 
-                    Firebase.firestore.collection("orders")
+                    Firebase.firestore
+                        .collection("orders")
                         .document(orderId)
                         .set(updated)
 
