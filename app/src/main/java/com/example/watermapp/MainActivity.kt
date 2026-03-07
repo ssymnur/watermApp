@@ -1,6 +1,5 @@
 package com.example.watermapp
 
-import android.R.attr.order
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -51,7 +50,7 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import com.example.watermapp.ui.theme.WaterAppTheme
-import com.example.watermapp.utils.toTL
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Locale
@@ -135,7 +134,28 @@ data class OrderItem(
     val currency: String = "USD"
 )
 
+/*data class Order(
+    val customer: Customer = Customer(),
+    val items: List<OrderItem> = emptyList(),
+
+    val discountPercent: Double = 0.0,
+    val kdvPercent: Double = 20.0,
+
+    val baseTotalTL: Double = 0.0,
+    val discountedTotalTL: Double = 0.0,
+    val kdvAmountTL: Double = 0.0,
+    val totalTL: Double = 0.0,
+
+    val usdRate: Double = 0.0,
+    val eurRate: Double = 0.0,
+
+    val timestamp: Long = System.currentTimeMillis(),
+
+    val createdAt: Long = System.currentTimeMillis()
+)*/
+
 data class Order(
+
     val customer: Customer = Customer(),
     val items: List<OrderItem> = emptyList(),
 
@@ -147,12 +167,16 @@ data class Order(
     val kdvAmountTL: Double = 0.0,
     val grandTotalTL: Double = 0.0,
 
+    val baseTotals: Map<String, Double> = emptyMap(),
+    val discountedTotals: Map<String, Double> = emptyMap(),
+
+    val totalTL: Double = 0.0,
+
     val usdRate: Double = 0.0,
     val eurRate: Double = 0.0,
 
-    val timestamp: Long = System.currentTimeMillis(),
-
-    val createdAt: Long = System.currentTimeMillis()
+    val timestamp: Long = 0,
+    val createdAt: Long = 0
 )
 
 data class CartItem(
@@ -486,7 +510,6 @@ fun AppNavigator(startDestination: String) {
             )
         }
 
-
         // PROJEYE ÜRÜN EKLE
         composable(
             route = "add_project_product_form/{projeAdi}",
@@ -678,14 +701,24 @@ fun LoginScreen(navController: NavHostController) {
             Spacer(Modifier.height(10.dp))
 
             Button(onClick = {
+
                 if (username == "waterm" && password == "waterm123") {
+
                     CartManager.SessionManager.isStaff = true
+
                     LoginPrefs.saveLogin(context, true)
-                    navController.navigate("categories")
-                }
-                else {
+
+                    FirebaseAuth.getInstance()
+                        .signInAnonymously()
+
+                    navController.navigate("categories") {
+                        popUpTo("login") { inclusive = true }
+                    }
+
+                } else {
                     errorText = "Hatalı giriş!"
                 }
+
             }) {
                 Text("Giriş Yap")
             }
@@ -824,13 +857,19 @@ fun DetailScreenCategory(
 
             val listener = FirebaseFirestore.getInstance()
                 .collection("products")
-                .addSnapshotListener { snapshot, _ ->
+                .addSnapshotListener { snapshot, error ->
 
-                    kategoriler = snapshot?.documents
+                    Log.d("FIREBASE", "snapshot size = ${snapshot?.size()}")
+                    Log.d("FIREBASE", "error = $error")
+
+                    snapshot?.documents?.forEach {
+                        Log.d("FIREBASE", it.data.toString())
+                    }
+
+                    val list = snapshot?.documents
                         ?.mapNotNull { doc ->
 
                             val ana = doc.getString("anaKategori")
-                                ?: doc.getString("kategori")
 
                             if (ana == anaKategori)
                                 doc.getString("altKategori")
@@ -838,7 +877,10 @@ fun DetailScreenCategory(
                         }
                         ?.distinct()
                         ?.sorted()
-                        ?: emptyList()
+
+                    if (!list.isNullOrEmpty()) {
+                        kategoriler = list
+                    }
                 }
 
             onDispose { listener.remove() }
@@ -948,38 +990,6 @@ fun DetailScreenCategory(
         }
     }
 }
-@Composable
-fun EvselUrunOzellikleri(urun: EvselUrun) {
-
-    urun.pompa?.let { Text("Pompa: $it") }
-    urun.asama?.let { Text("Aşama: $it") }
-    urun.membran_gpd?.let { Text("Membran: $it GPD") }
-    urun.tank_galon?.let { Text("Tank: $it Galon") }
-}
-@Composable
-fun EndustriyelUrunOzellikleri(urun: EndustriyelUrun) {
-
-    Column {
-
-        urun.model?.let { Text("Model: $it") }
-        urun.debi_m3_saat?.let { Text("Debi: $it m³/saat") }
-        urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
-        urun.giris_cikis_baglanti?.let { Text("Giriş / Çıkış: $it") }
-
-    }
-}
-@Composable
-fun PeyzajUrunOzellikleri(urun: PeyzajUrun) {
-
-    Column {
-
-        urun.nozul_rengi?.let { Text("Nozul Rengi: $it") }
-        urun.atis_mesafesi?.let { Text("Atış Mesafesi: $it") }
-        urun.basinc_degeri?.let { Text("Basınç: $it") }
-
-    }
-}
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1278,9 +1288,12 @@ fun CartScreen(navController: NavHostController) {
                     }
 
                     IconButton(onClick = {
-                        navController.navigate("customerForm")
+                        navController.navigate("customerForm") {
+                            popUpTo("cart") { inclusive = false }
+                            launchSingleTop = true
+                        }
                     }) {
-                        Icon(Icons.Default.Person, contentDescription = "Müşteri Kaydet")
+                        Icon(Icons.Default.Person, null)
                     }
                 }
             )
@@ -2401,7 +2414,7 @@ fun CustomerFormScreen(navController: NavHostController) {
         )
     }
 
-    val totalTL = previewOrder.grandTotalTL
+    val totalTL = previewOrder.totalTL
 
     Scaffold(
 
@@ -2565,6 +2578,7 @@ fun CustomerFormScreen(navController: NavHostController) {
     }
 }
 
+
 fun saveOrderToFirebase(order: Order) {
     val db = FirebaseFirestore.getInstance()
 
@@ -2587,8 +2601,12 @@ data class OrderDoc(
 @Composable
 fun OrdersScreen(navController: NavHostController) {
 
-    if (!CartManager.SessionManager.isStaff) {
-        LaunchedEffect(Unit) { navController.popBackStack() }
+    val isStaff = CartManager.SessionManager.isStaff
+
+    if (!isStaff) {
+        LaunchedEffect(Unit) {
+            navController.popBackStack()
+        }
         return
     }
 
@@ -2602,12 +2620,24 @@ fun OrdersScreen(navController: NavHostController) {
 
         val listener = Firebase.firestore
             .collection("orders")
-            .addSnapshotListener { snapshot, _ ->
+            .addSnapshotListener { snapshot, error ->
+
+                if (error != null) {
+                    Log.e("FIREBASE_ERROR", error.message ?: "")
+                    return@addSnapshotListener
+                }
 
                 orders = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Order::class.java)?.let {
-                        OrderDoc(doc.id, it)
+
+                    val order = doc.toObject(Order::class.java)
+
+                    order?.let {
+                        OrderDoc(
+                            id = doc.id,
+                            order = it
+                        )
                     }
+
                 } ?: emptyList()
             }
 
@@ -2627,24 +2657,29 @@ fun OrdersScreen(navController: NavHostController) {
             title = { Text("Silme Onayı") },
             text = { Text("Siparişi silmek istiyor musun?") },
             confirmButton = {
-                TextButton(onClick = {
 
-                    Firebase.firestore
-                        .collection("orders")
-                        .document(orderToDelete!!.id)
-                        .delete()
+                TextButton(
+                    onClick = {
 
-                    showDeleteDialog = false
-                    orderToDelete = null
-                }) {
+                        Firebase.firestore
+                            .collection("orders")
+                            .document(orderToDelete!!.id)
+                            .delete()
+
+                        showDeleteDialog = false
+                        orderToDelete = null
+                    }
+                ) {
                     Text("Evet")
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    orderToDelete = null
-                }) {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        orderToDelete = null
+                    }
+                ) {
                     Text("İptal")
                 }
             }
@@ -2684,7 +2719,7 @@ fun OrdersScreen(navController: NavHostController) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
 
-                items(filtered) { orderDoc ->
+                items(filtered, key = { it.id }) { orderDoc ->
 
                     val order = orderDoc.order
 
@@ -2705,25 +2740,16 @@ fun OrdersScreen(navController: NavHostController) {
                             // ÜRÜN LİSTESİ
                             order.items.forEach { item ->
 
-                                val tlPrice = when (item.currency) {
+                                /*val tlPrice = when (item.currency) {
                                     "USD" -> item.price * order.usdRate
                                     "EUR" -> item.price * order.eurRate
                                     else -> item.price
-                                }
+                                }*/
+                                val tlPrice = item.price
 
                                 val totalItemTL = tlPrice * item.quantity
 
-                                Text("${item.model} x${item.quantity}")
-
-                                Text(
-                                    "Birim TL: %.2f ₺".format(tlPrice),
-                                    color = Color.Gray
-                                )
-
-                                Text(
-                                    "Satır Toplam: %.2f ₺".format(totalItemTL),
-                                    color = Color.Blue
-                                )
+                                Text("${item.model}  •  ${item.quantity} adet")
 
                                 Spacer(Modifier.height(6.dp))
                             }
@@ -2753,7 +2779,7 @@ fun OrdersScreen(navController: NavHostController) {
 
                             Text(
                                 "Genel Toplam : %.2f ₺"
-                                    .format(order.grandTotalTL),
+                                    .format(order.totalTL),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Color(0xFF2E7D32)
                             )
@@ -2775,8 +2801,6 @@ fun OrdersScreen(navController: NavHostController) {
         }
     }
 }
-
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -3305,7 +3329,6 @@ fun AddProjectProductFormScreen(
     }
 }
 
-
 @Composable
 fun EditOrderScreen(orderId: String, navController: NavHostController) {
 
@@ -3366,7 +3389,7 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
 
             Text(
                 "Genel Toplam: %.2f ₺"
-                    .format(Locale.getDefault(), currentOrder.grandTotalTL),
+                    .format(Locale.getDefault(), currentOrder.totalTL),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color(0xFF2E7D32)
             )
@@ -3404,6 +3427,7 @@ fun EditOrderScreen(orderId: String, navController: NavHostController) {
                 Text("Kaydet")
             }
         }
+
     }
 }
 

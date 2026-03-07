@@ -21,7 +21,7 @@ sealed class BaseUrun {
 
     abstract val urun_adi: String
     abstract val marka: String?
-    abstract val urun_kodu: String?
+    abstract val urun_kodu: Any?
     abstract val fiyat: Double?
     abstract val paraBirimi: String
     abstract val ozellikler: String?
@@ -39,7 +39,7 @@ data class EvselUrun(
     override val fiyat: Double? = null,
     override val paraBirimi: String = "USD",
     override val ozellikler: String? = null,
-    override val urun_kodu: String? = null,
+    override val urun_kodu: Any? = null,
 
     val pompa: String? = null,
     val asama: String? = null,
@@ -60,7 +60,7 @@ data class EndustriyelUrun(
     override val fiyat: Double? = null,
     override val paraBirimi: String = "EUR",
     override val ozellikler: String? = null,
-    override val urun_kodu: String? = null,
+    override val urun_kodu: Any? = null,
 
     val model: String? = null,
     val tank_baglanti: String? = null,
@@ -80,7 +80,7 @@ data class PeyzajUrun(
     override val fiyat: Double? = null,
     override val paraBirimi: String = "USD",
     override val ozellikler: String? = null,
-    override val urun_kodu: String? = null,
+    override val urun_kodu: Any? = null,
 
     val ebat: String? = null,
     val istasyon_sayisi: Int? = null,

@@ -43,23 +43,19 @@ object ProductRepository {
 
                 val list = snapshot?.documents?.mapNotNull { doc ->
 
-                    when (doc.getString("anaKategori")) {
+                    when (anaKategori) {
 
                         "Evsel" ->
-                            doc.toObject(EvselUrun::class.java)
-                                ?.copy(id = doc.id)
+                            doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
 
                         "Endüstriyel" ->
-                            doc.toObject(EndustriyelUrun::class.java)
-                                ?.copy(id = doc.id)
+                            doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
 
                         "Peyzaj" ->
-                            doc.toObject(PeyzajUrun::class.java)
-                                ?.copy(id = doc.id)
+                            doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
 
                         else -> null
                     }
-
                 } ?: emptyList()
 
                 onResult(list)

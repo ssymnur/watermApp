@@ -48,7 +48,7 @@ object OrderCalculator {
             baseTotalTL = baseTotalTL,
             discountedTotalTL = discountedTotalTL,
             kdvAmountTL = kdvAmount,
-            grandTotalTL = grandTotal,
+            totalTL = grandTotal,
             usdRate = usdRate,
             eurRate = eurRate
         )
