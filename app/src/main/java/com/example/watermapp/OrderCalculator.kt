@@ -1,4 +1,5 @@
 package com.example.watermapp
+import com.example.watermapp.model.*
 
 object OrderCalculator {
 
@@ -45,12 +46,19 @@ object OrderCalculator {
             items = items,
             discountPercent = discountPercent,
             kdvPercent = kdvPercent,
+
             baseTotalTL = baseTotalTL,
             discountedTotalTL = discountedTotalTL,
             kdvAmountTL = kdvAmount,
+
+            grandTotalTL = grandTotal,
             totalTL = grandTotal,
+
             usdRate = usdRate,
-            eurRate = eurRate
+            eurRate = eurRate,
+
+            timestamp = System.currentTimeMillis(),
+            createdAt = System.currentTimeMillis()
         )
     }
 }
