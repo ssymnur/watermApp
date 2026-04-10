@@ -24,6 +24,7 @@ import com.example.watermapp.EvselUrun
 import com.example.watermapp.PeyzajUrun
 import com.example.watermapp.data.CartManager
 import com.google.firebase.firestore.FirebaseFirestore
+import java.util.UUID
 import kotlin.jvm.java
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,45 +120,52 @@ fun ProjelerScreen(
 
                                 // Sepete ekleme butonu
                                 // Sepete ekleme kısmı düzeltilmiş
-                                IconButton(onClick = {
-                                    // Projeyi sepete ekle (header)
-                                    CartManager.cart.add(
-                                        CartManager.CartItem(
-                                            urun = null,
-                                            quantity = mutableStateOf(1),
-                                            isProjectHeader = true,
-                                            projectName = projeAdi
+                                IconButton(
+                                    onClick = {
+
+                                        val instanceId = UUID.randomUUID().toString()
+
+                                        // 🔹 Proje header ekle
+                                        CartManager.cart.add(
+                                            CartManager.CartItem(
+                                                urun = null,
+                                                quantity = mutableStateOf(1),
+                                                isProjectHeader = true,
+                                                projectName = projeAdi,
+                                                projectInstanceId = instanceId
+                                            )
                                         )
-                                    )
 
-                                    // Firestore'dan ürünleri çek
-                                    db.collection("projects")
-                                        .document(projeAdi)
-                                        .collection("urunler")
-                                        .get()
-                                        .addOnSuccessListener { snapshot ->
-                                            snapshot.documents.forEach { doc ->
-                                                val urun = when(doc.getString("anaKategori")) {
-                                                    "Evsel" -> doc.toObject(EvselUrun::class.java)?.copy(id = doc.id)
-                                                    "Endüstriyel" -> doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
-                                                    "Peyzaj" -> doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
-                                                    else -> null
-                                                }
+                                        // 🔹 Firestore'dan ürünleri çek
+                                        db.collection("projects")
+                                            .document(projeAdi)
+                                            .collection("urunler")
+                                            .get()
+                                            .addOnSuccessListener { snapshot ->
 
-                                                urun?.let {
-                                                    CartManager.cart.add(
-                                                        CartManager.CartItem(
-                                                            urun = it,
-                                                            quantity = mutableStateOf(1),
-                                                            isProjectHeader = false,
-                                                            projectName = projeAdi
+                                                snapshot.documents.forEach { doc ->
+
+                                                    val urun = doc.toObject(EndustriyelUrun::class.java)
+
+                                                    urun?.let { urunItem ->
+                                                        CartManager.cart.add(
+                                                            CartManager.CartItem(
+                                                                urun = urunItem,
+                                                                quantity = mutableStateOf(1),
+                                                                isProjectHeader = false,
+                                                                projectName = projeAdi,
+                                                                projectInstanceId = instanceId
+                                                            )
                                                         )
-                                                    )
+                                                    }
                                                 }
                                             }
-                                        }
-                                }) {
-                                    Icon(imageVector = Icons.Default.Add, contentDescription = "Sepete Ekle")
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Sepete Ekle"
+                                    )
                                 }
                             }
                         }

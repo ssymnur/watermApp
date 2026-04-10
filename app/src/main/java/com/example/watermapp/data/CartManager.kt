@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.watermapp.BaseUrun
+import java.util.UUID
 
 object CartManager {
 
@@ -21,25 +22,21 @@ object CartManager {
     var kdvRate by mutableStateOf(0.20) // %20
 
     // Proje ekleme
-    fun addProject(projeAdi: String, urunler: List<BaseUrun>) {
-        // 1️⃣ Proje başlığı (urun = null)
-        cart.add(
-            CartItem(
-                urun = null,
-                quantity = mutableStateOf(0),
-                projectName = projeAdi,
-                isProjectHeader = true
-            )
-        )
 
-        // 2️⃣ Ürünleri ekle
+    fun addProject(projeAdi: String, urunler: List<BaseUrun>) {
+
+        val newInstanceId = UUID.randomUUID().toString() // 🔥 HER EKLEMEDE YENİ ID
+
         urunler.forEach { urun ->
-            val existing = cart.find { it.urun?.id == urun.id }
-            if (existing != null) {
-                existing.quantity.value++
-            } else {
-                cart.add(CartItem(urun = urun, quantity = mutableStateOf(1), projectName = projeAdi))
-            }
+
+            cart.add(
+                CartItem(
+                    urun = urun,
+                    quantity = mutableStateOf(1),
+                    projectName = projeAdi,
+                    projectInstanceId = newInstanceId // 💥 EN KRİTİK SATIR
+                )
+            )
         }
     }
 
@@ -109,6 +106,7 @@ object CartManager {
     }
 
     data class CartItem(
+        val projectInstanceId: String? = null,
         val urun: BaseUrun?,
         val quantity: MutableState<Int> = mutableStateOf(1),
         val projectName: String? = null,

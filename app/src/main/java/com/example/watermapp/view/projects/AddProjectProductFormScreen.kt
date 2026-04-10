@@ -172,7 +172,7 @@ fun AddProjectProductFormScreen(
 
                         // 🔹 BaseUrun yerine concrete class
                         val product: BaseUrun = EndustriyelUrun(
-                            anaKategori = "Proje",
+                            anaKategori = "Endüstriyel",
                             altKategori = projeAdi,
                             urun_adi = urunAdi.trim(),
                             marka = marka.trim(),

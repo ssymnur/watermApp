@@ -51,7 +51,7 @@ data class EvselUrun(
 // ---------------- ENDÜSTRİYEL ----------------
 
 data class EndustriyelUrun(
-    override val id: String = "",
+    override var id: String = "",
     override val anaKategori: String = "Endüstriyel",
     override val altKategori: String = "",
 
