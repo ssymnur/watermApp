@@ -70,15 +70,50 @@ fun FormField(
 
 
 fun saveOrderToFirebase(order: Order) {
+
     val db = FirebaseFirestore.getInstance()
 
+    val orderMap = hashMapOf(
+
+        "customer" to hashMapOf(
+            "customerName" to order.customer.customerName,
+            "companyName" to order.customer.companyName,
+            "phone" to order.customer.phone,
+            "deviceName" to order.customer.deviceName,
+            "email" to order.customer.email,
+            "staffName" to order.customer.staffName,
+            "note" to order.customer.note,
+            "address" to order.customer.address
+        ),
+
+        "items" to order.items.map {
+            hashMapOf(
+                "model" to it.model,
+                "quantity" to it.quantity,
+                "price" to it.price,
+                "currency" to it.currency
+            )
+        },
+
+        "discountPercent" to order.discountPercent,
+        "kdvPercent" to order.kdvPercent,
+        "baseTotalTL" to order.baseTotalTL,
+        "grandTotalTL" to order.grandTotalTL,
+        "totalTL" to order.totalTL,
+
+        "usdRate" to order.usdRate,
+        "eurRate" to order.eurRate,
+
+        "timestamp" to System.currentTimeMillis()
+    )
+
     db.collection("orders")
-        .add(order)
-        .addOnSuccessListener { docRef ->
-            println("Sipariş başarıyla kaydedildi: ${docRef.id}")
+        .add(orderMap)
+        .addOnSuccessListener {
+            println("Sipariş başarıyla kaydedildi ✅")
         }
-        .addOnFailureListener { e ->
-            println("Sipariş kaydedilemedi: $e")
+        .addOnFailureListener {
+            println("Hata ❌: $it")
         }
 }
 

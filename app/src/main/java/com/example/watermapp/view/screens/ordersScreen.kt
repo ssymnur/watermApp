@@ -180,6 +180,10 @@ fun OrdersScreen(navController: NavHostController) {
                             Text("Telefon: ${order.customer.phone}")
                             Text("Personel: ${order.customer.staffName}")
                             Text("Tarih: ${formatDate(order.timestamp)}")
+                            Text("Cihaz: ${order.customer.deviceName}")
+                            Text("Mail: ${order.customer.email}")
+                            Text("Not: ${order.customer.note}")
+                            Text("Adres: ${order.customer.address}")
 
                             Spacer(Modifier.height(8.dp))
 
