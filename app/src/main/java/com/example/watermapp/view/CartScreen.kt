@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Person
@@ -49,6 +51,10 @@ import com.example.watermapp.data.CartManager
 import com.example.watermapp.printView
 import kotlin.collections.component1
 import kotlin.collections.component2
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.runtime.LaunchedEffect
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,63 +168,93 @@ fun CartScreen(navController: NavHostController) {
 
                     val projectName = items.first().projectName ?: "Proje"
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                    ) {
+                    val dismissState = rememberSwipeToDismissBoxState()
 
-                        Column {
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
 
-                            // 🔹 HEADER (OK EKLENDİ)
+                            // 🔥 SADECE STATE SET ET
+                            projectToDelete = instanceId
+                            showDeleteDialog = true
+                            itemToDelete = null
+
+                            dismissState.reset()
+                        }
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = true,
+                        enableDismissFromEndToStart = false,
+                        backgroundContent = {
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .fillMaxSize()
+                                    .background(Color.White),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Start
                             ) {
-
-                                Text(
-                                    text = "📦 $projectName",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    modifier = Modifier.weight(1f)
+                                Spacer(modifier = Modifier.width(24.dp))
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Color.Red
                                 )
-
-                                IconButton(
-                                    onClick = {
-                                        expandedProjects[instanceId ?: ""] =
-                                            !(expandedProjects[instanceId ?: ""] ?: false)
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector =
-                                            if (expandedProjects[instanceId ?: ""] == true)
-                                                Icons.Default.KeyboardArrowUp
-                                            else
-                                                Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Expand"
-                                    )
-                                }
                             }
+                        }
+                    ) {
 
-                            // 🔹 SADECE AÇILINCA GÖSTER
-                            if (expandedProjects[instanceId ?: ""] == true) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            Column {
 
-                                items.forEach { item ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
 
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 16.dp, bottom = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Text(
+                                        text = "📦 $projectName",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    IconButton(
+                                        onClick = {
+                                            expandedProjects[instanceId ?: ""] =
+                                                !(expandedProjects[instanceId ?: ""] ?: false)
+                                        }
                                     ) {
-
-                                        Text(
-                                            text = item.urun?.urun_adi ?: "",
-                                            modifier = Modifier.weight(1f)
+                                        Icon(
+                                            imageVector =
+                                                if (expandedProjects[instanceId ?: ""] == true)
+                                                    Icons.Default.KeyboardArrowUp
+                                                else
+                                                    Icons.Default.KeyboardArrowDown,
+                                            contentDescription = "Expand"
                                         )
+                                    }
+                                }
 
-                                        Text("Adet: ${item.quantity.value}")
+                                if (expandedProjects[instanceId ?: ""] == true) {
+                                    items.forEach { item ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 16.dp, bottom = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = item.urun?.urun_adi ?: "",
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text("Adet: ${item.quantity.value}")
+                                        }
                                     }
                                 }
                             }
@@ -228,46 +264,104 @@ fun CartScreen(navController: NavHostController) {
                 // 🛒 DİĞER ÜRÜNLER (TEK TEK)
                 items(otherItems) { item ->
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    ) {
+                    val dismissState = rememberSwipeToDismissBoxState()
 
-                        Row(
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
+                            itemToDelete = item
+                            showDeleteDialog = true
+                            projectToDelete = null
+                            dismissState.reset() // 🔥 EN KRİTİK SATIR
+                        }
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = true,
+                        enableDismissFromEndToStart = false,
+                        backgroundContent = {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.White),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                Spacer(modifier = Modifier.width(24.dp))
+                                Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
+                            }
+                        }
+                    ) {
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 4.dp)
                         ) {
-
-                            Text(
-                                text = item.urun?.urun_adi ?: "",
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            Text("Adet: ${item.quantity.value}")
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = item.urun?.urun_adi ?: "",
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Text("Adet: ${item.quantity.value}")
+                            }
                         }
                     }
                 }
             }
 
-            // Silme onayı
-            if (showDeleteDialog && projectToDelete != null){
+            if (showDeleteDialog) {
                 AlertDialog(
-                    onDismissRequest = { showDeleteDialog = false },
-                    title = { Text("Ürünü Sil") },
-                    text = { Text("Bu ürünü sepetten silmek istiyor musun?") },
+                    onDismissRequest = {
+                        showDeleteDialog = false
+                        itemToDelete = null
+                        projectToDelete = null
+                    },
+                    title = {
+                        Text(
+                            if (itemToDelete != null) "Ürünü Sil"
+                            else "Projeyi Sil"
+                        )
+                    },
+                    text = {
+                        Text(
+                            if (itemToDelete != null)
+                                "Bu ürünü sepetten silmek istiyor musunuz?"
+                            else
+                                "Bu projeyi ve içindeki tüm ürünleri silmek istiyor musunuz?"
+                        )
+                    },
                     confirmButton = {
                         TextButton(onClick = {
-                            CartManager.cart.remove(itemToDelete!!)
+
+                            // 🔥 ÜRÜN SİL
+                            if (itemToDelete != null) {
+                                CartManager.cart.remove(itemToDelete!!)
+                            }
+
+                            // 🔥 PROJE SİL (EN ÖNEMLİ KISIM)
+                            if (projectToDelete != null) {
+                                CartManager.cart.removeAll {
+                                    it.projectInstanceId == projectToDelete
+                                }
+                            }
+
+                            itemToDelete = null
+                            projectToDelete = null
                             showDeleteDialog = false
+
                         }) {
                             Text("Evet")
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = {
+                            itemToDelete = null
+                            projectToDelete = null
                             showDeleteDialog = false
                         }) {
                             Text("Vazgeç")

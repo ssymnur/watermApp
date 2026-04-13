@@ -18,10 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.example.watermapp.BaseUrun
 import com.example.watermapp.EndustriyelUrun
-import com.example.watermapp.EvselUrun
-import com.example.watermapp.PeyzajUrun
+
 import com.example.watermapp.data.CartManager
 import com.google.firebase.firestore.FirebaseFirestore
 import java.util.UUID
