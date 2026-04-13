@@ -16,6 +16,7 @@ import com.example.watermapp.view.CartScreen
 import com.example.watermapp.view.CategoryScreen
 import com.example.watermapp.view.DetailScreenCategory
 import com.example.watermapp.view.DetailScreenProducts
+import com.example.watermapp.view.LoginScreen
 import com.example.watermapp.view.projects.AddProjectProductFormScreen
 import com.example.watermapp.view.projects.EditProjectProductScreen
 import com.example.watermapp.view.projects.ProjeDetayScreen
@@ -269,6 +270,9 @@ import com.google.firebase.firestore.FirebaseFirestore
                 MainLayout(navController) {
                     CategoryScreen(navController)
                 }
+            }
+            composable("login") {
+                LoginScreen(navController)
             }
 
             composable(

@@ -116,13 +116,14 @@ fun CartScreen(navController: NavHostController) {
                         Icon(Icons.Default.Print, contentDescription = "Yazdır")
                     }
 
-                    IconButton(onClick = {
-                        navController.navigate("customerForm") {
-                            popUpTo("cart") { inclusive = false }
-                            launchSingleTop = true
+                    if (CartManager.SessionManager.isStaff) {
+                        IconButton(onClick = {
+                            navController.navigate("customerForm") {
+                                launchSingleTop = true
+                            }
+                        }) {
+                            Icon(Icons.Default.Person, contentDescription = "Müşteri Formu")
                         }
-                    }) {
-                        Icon(Icons.Default.Person, null)
                     }
                 }
             )

@@ -17,12 +17,14 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.ShoppingCart
 import android.net.Uri
+import androidx.compose.material.icons.filled.DoubleArrow
 import androidx.compose.material.icons.filled.Person
 import com.example.watermapp.data.CartManager
 import com.example.watermapp.data.LoginPrefs
 import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.watermapp.model.*
+import com.example.watermapp.view.LoginScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -117,7 +119,6 @@ fun saveOrderToFirebase(order: Order) {
         }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainLayout(
@@ -125,47 +126,64 @@ fun MainLayout(
     content: @Composable () -> Unit
 ) {
 
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Scaffold(
+
+        // 🔝 TOP BAR
         topBar = {
             TopAppBar(
                 title = { Text("WaterApp") },
+
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, "Geri")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Geri")
+                    }
+                },
+
+                // ✅ DOĞRU YER BURASI
+                actions = {
+                    IconButton(onClick = {
+                        showLogoutDialog = true
+                    }) {
+                        Icon(Icons.Default.DoubleArrow, contentDescription = "Çıkış")
                     }
                 }
             )
         },
 
+        // 🔻 BOTTOM BAR
         bottomBar = {
             BottomAppBar {
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
 
+                    // 🏠 Ana Sayfa
                     IconButton(onClick = {
                         navController.navigate("categories") {
                             popUpTo("categories") { inclusive = true }
                         }
                     }) {
-                        Icon(Icons.Default.Home, "Ana Sayfa")
+                        Icon(Icons.Default.Home, contentDescription = "Ana Sayfa")
                     }
 
+                    // 🛒 Sepet
                     IconButton(onClick = {
                         navController.navigate("cart")
                     }) {
-                        Icon(Icons.Default.ShoppingCart, "Sepet")
+                        Icon(Icons.Default.ShoppingCart, contentDescription = "Sepet")
                     }
 
-                    // ✅ sadece personel görür
+                    // 👨‍💼 SADECE PERSONEL
                     if (CartManager.SessionManager.isStaff) {
                         IconButton(onClick = {
                             navController.navigate("orders")
                         }) {
-                            Icon(Icons.Default.Person, "Müşteriler")
+                            Icon(Icons.Default.Person, contentDescription = "Müşteriler")
                         }
                     }
                 }
@@ -176,6 +194,46 @@ fun MainLayout(
         Box(Modifier.padding(padding)) {
             content()
         }
+    }
+
+    // 🚪 LOGOUT DIALOG
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+
+            title = { Text("Çıkış Yap") },
+
+            text = { Text("Uygulamadan çıkmak istiyor musunuz?") },
+
+            confirmButton = {
+                TextButton(onClick = {
+
+                    // 1. Session temizle
+                    LoginPrefs.logout(context)
+                    CartManager.SessionManager.isStaff = false
+
+                    // 2. Login ekranına git + backstack temizle
+                    navController.navigate("login") {
+                        popUpTo(navController.graph.startDestinationId) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+
+                    showLogoutDialog = false
+                }) {
+                    Text("Evet")
+                }
+            },
+
+            dismissButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                }) {
+                    Text("Vazgeç")
+                }
+            }
+        )
     }
 }
 
