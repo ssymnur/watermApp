@@ -95,3 +95,22 @@ data class PeyzajUrun(
 
 
 ) : BaseUrun()
+
+// ---------------- KİMYASAL ----------------
+
+data class KimyasalUrun(
+    override val id: String = "",
+    override val anaKategori: String = "Kimyasal",
+    override val altKategori: String = "",
+
+    override val urun_adi: String = "",
+    override val marka: String? = null,
+    override val fiyat: Double? = null,
+    override val paraBirimi: String = "TL",
+    override val ozellikler: String? = null,
+    override val urun_kodu: Any? = null,
+
+    val ambalaj_kg: String? = null,
+    val kullanim_amaci: String? = null
+
+) : BaseUrun()

@@ -54,6 +54,9 @@ object ProductRepository {
                         "Peyzaj" ->
                             doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
 
+                        "Kimyasal" ->
+                            doc.toObject(KimyasalUrun::class.java)?.copy(id = doc.id)
+
                         else -> null
                     }
                 } ?: emptyList()
@@ -88,6 +91,9 @@ object ProductRepository {
 
                         "Peyzaj" ->
                             doc.toObject(PeyzajUrun::class.java)
+                                ?.copy(id = doc.id)
+                        "Kimyasal" ->
+                            doc.toObject(KimyasalUrun::class.java)
                                 ?.copy(id = doc.id)
 
                         else -> null

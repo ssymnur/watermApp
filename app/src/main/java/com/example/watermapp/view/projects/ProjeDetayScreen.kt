@@ -19,6 +19,7 @@ import androidx.navigation.NavHostController
 import com.example.watermapp.BaseUrun
 import com.example.watermapp.EndustriyelUrun
 import com.example.watermapp.EvselUrun
+import com.example.watermapp.KimyasalUrun
 import com.example.watermapp.PeyzajUrun
 import com.example.watermapp.data.CartManager
 import com.google.firebase.firestore.FirebaseFirestore
@@ -177,6 +178,10 @@ fun ProjeDetayScreen(
                                         is PeyzajUrun -> {
                                             Text("Nozul Rengi: ${urun.nozul_rengi ?: "-"}")
                                             Text("Atış Mesafesi: ${urun.atis_mesafesi ?: "-"}")
+                                        }
+                                        is KimyasalUrun -> {
+                                            Text("Ambalaj/KG: ${urun.ambalaj_kg ?: "-"}")
+                                            Text("Kullanım Amacı: ${urun.kullanim_amaci ?: "-"}")
                                         }
                                     }
                                     Text("Marka: ${urun.marka ?: "-"}")

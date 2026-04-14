@@ -92,6 +92,13 @@ fun DetailScreenCategory(
             onDispose { }
 
         }
+        // 🔹 KİMYASAL ANA KATEGORİ
+        else if (anaKategori == "Kimyasal" && ustKategori == null) {
+
+            kategoriler = listOf("Havuz")
+
+            onDispose { }
+        }
 
         // 🔹 3️⃣ DİĞER KATEGORİLER (Firebase’den ÇEK)
         else {
@@ -207,7 +214,7 @@ fun DetailScreenCategory(
                         .clickable {
 
                             // 🔥 Eğer Peyzaj ana ekrandaysak → üst kategoriye git
-                            if (anaKategori == "Peyzaj" && ustKategori == null) {
+                            if (ustKategori == null && anaKategori == "Peyzaj") {
 
                                 navController.navigate(
                                     "detail/$anaKategori/${kategori.toNavArg()}"

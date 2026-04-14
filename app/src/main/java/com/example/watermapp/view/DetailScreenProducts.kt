@@ -36,6 +36,7 @@ import androidx.navigation.NavHostController
 import com.example.watermapp.BaseUrun
 import com.example.watermapp.EndustriyelUrun
 import com.example.watermapp.EvselUrun
+import com.example.watermapp.KimyasalUrun
 import com.example.watermapp.PeyzajUrun
 import com.example.watermapp.data.CartManager
 import com.example.watermapp.toNavArg
@@ -74,6 +75,9 @@ fun DetailScreenProducts(
 
                         "Peyzaj" ->
                             doc.toObject(PeyzajUrun::class.java)?.copy(id = doc.id)
+
+                        "Kimyasal" ->
+                            doc.toObject(KimyasalUrun::class.java)?.copy(id = doc.id)
 
                         else -> null
                     }
@@ -219,6 +223,10 @@ fun DetailScreenProducts(
                                     urun.tanim?.takeIf { it.isNotBlank() }?.let {
                                         Text("Tanım: $it")
                                     }
+                                }
+                                is KimyasalUrun -> {
+                                    urun.ambalaj_kg?.let { Text("Ambalaj/KG: $it") }
+                                    urun.kullanim_amaci?.let { Text("Kullanım Amacı: $it") }
                                 }
                             }
 

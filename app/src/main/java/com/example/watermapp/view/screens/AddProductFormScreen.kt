@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.watermapp.EndustriyelUrun
 import com.example.watermapp.EvselUrun
+import com.example.watermapp.KimyasalUrun
 import com.example.watermapp.PeyzajUrun
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
@@ -80,6 +81,10 @@ fun AddProductFormScreen(
     var tanim by rememberSaveable { mutableStateOf("") }
     var kutuAdedi by rememberSaveable { mutableStateOf("") }
     var basincDegeri by rememberSaveable { mutableStateOf("") }
+
+    //KİMYASAL
+    var ambalajKg by rememberSaveable { mutableStateOf("") }
+    var kullanimAmaci by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -155,6 +160,10 @@ fun AddProductFormScreen(
                     field(basincDegeri, { basincDegeri = it }, "Basınç Değeri")
                     field(tanim, { tanim = it }, "Tanım")
 
+                }
+                "Kimyasal" -> {
+                    field(ambalajKg, { ambalajKg = it }, "Ambalaj / KG")
+                    field(kullanimAmaci, { kullanimAmaci = it }, "Kullanım Amacı")
                 }
             }
 
@@ -247,6 +256,18 @@ fun AddProductFormScreen(
                                 atis_mesafesi = sayfaPdf,
                                 basinc_degeri = basincDegeri,
                                 tanim = tanim,
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi,
+                                ozellikler = ozellikler
+                            )
+                            "Kimyasal" -> KimyasalUrun(
+                                anaKategori = anaKategori,
+                                altKategori = altKategori,
+                                urun_adi = urunAdi,
+                                marka = null, // boş bırakmak daha doğru
+                                urun_kodu = null,
+                                ambalaj_kg = ambalajKg,
+                                kullanim_amaci = kullanimAmaci,
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi,
                                 ozellikler = ozellikler

@@ -42,6 +42,7 @@ import androidx.navigation.NavHostController
 import com.example.watermapp.BaseUrun
 import com.example.watermapp.EndustriyelUrun
 import com.example.watermapp.EvselUrun
+import com.example.watermapp.KimyasalUrun
 import com.example.watermapp.PeyzajUrun
 import com.example.watermapp.ProductRepository
 import com.google.firebase.Firebase
@@ -103,6 +104,13 @@ fun EditProductScreen(
     var kutu by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.kutu_adedi?.toString() ?: "") }
     var tanim by rememberSaveable { mutableStateOf((urun as? PeyzajUrun)?.tanim ?: "") }
 
+    var ambalajKg by rememberSaveable {
+        mutableStateOf((urun as? KimyasalUrun)?.ambalaj_kg ?: "")
+    }
+    var kullanimAmaci by rememberSaveable {
+        mutableStateOf((urun as? KimyasalUrun)?.kullanim_amaci ?: "")
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -163,6 +171,24 @@ fun EditProductScreen(
                     item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
                     item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
                     item { OutlinedTextField(tanim, { tanim = it }, label = { Text("Tanım") }) }
+                }
+                is KimyasalUrun -> {
+
+                    item {
+                        OutlinedTextField(
+                            ambalajKg,
+                            { ambalajKg = it },
+                            label = { Text("Ambalaj / KG") }
+                        )
+                    }
+
+                    item {
+                        OutlinedTextField(
+                            kullanimAmaci,
+                            { kullanimAmaci = it },
+                            label = { Text("Kullanım Amacı") }
+                        )
+                    }
                 }
             }
 
@@ -248,6 +274,13 @@ fun EditProductScreen(
                                 basinc_degeri = basinc,
                                 tanim = tanim,
                                 urun_kodu = kod.ifBlank { null },
+                                fiyat = fiyat.toDoubleOrNull(),
+                                paraBirimi = paraBirimi
+                            )
+                            is KimyasalUrun -> urun.copy(
+                                urun_adi = urunAdi,
+                                ambalaj_kg = ambalajKg,
+                                kullanim_amaci = kullanimAmaci,
                                 fiyat = fiyat.toDoubleOrNull(),
                                 paraBirimi = paraBirimi
                             )

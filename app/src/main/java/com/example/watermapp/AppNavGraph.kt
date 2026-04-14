@@ -152,6 +152,30 @@ import com.google.firebase.firestore.FirebaseFirestore
                                     )
                                 }
 
+                                "Kimyasal" -> {
+                                    KimyasalUrun(
+                                        id = doc.id,
+                                        anaKategori = anaKategori ?: "",
+                                        altKategori = doc.getString("altKategori") ?: "",
+                                        urun_adi = doc.getString("urun_adi") ?: "",
+
+                                        marka = null,
+                                        urun_kodu = null,
+
+                                        fiyat = when (val f = doc.get("fiyat")) {
+                                            is Number -> f.toDouble()
+                                            is String -> f.toDoubleOrNull()
+                                            else -> null
+                                        },
+
+                                        paraBirimi = doc.getString("paraBirimi") ?: "USD",
+                                        ozellikler = doc.getString("ozellikler"),
+
+                                        ambalaj_kg = doc.getString("ambalaj_kg"),
+                                        kullanim_amaci = doc.getString("kullanim_amaci")
+                                    )
+                                }
+
                                 else -> null
                             }
                         }

@@ -60,6 +60,10 @@ object SeedUploader {
                         map["basinc_degeri"] = urun.basinc_degeri ?: ""
                         map["tanim"] = urun.tanim ?: ""
                     }
+                    is KimyasalUrun -> {
+                        map["ambalaj_kg"] = urun.ambalaj_kg ?: ""
+                        map["kullanim_amaci"] = urun.kullanim_amaci ?: ""
+                    }
                 }
 
                 db.collection("products")
