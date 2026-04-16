@@ -60,6 +60,8 @@ import androidx.compose.runtime.LaunchedEffect
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(navController: NavHostController) {
+    var showSummary by remember { mutableStateOf(false) }
+
     val expandedProjects = remember { mutableStateMapOf<String, Boolean>() }
     var projectToDelete by remember { mutableStateOf<String?>(null) }
 
@@ -159,7 +161,7 @@ fun CartScreen(navController: NavHostController) {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(4.dp))
 
             // ✅ SEPET LİSTESİ
             LazyColumn(modifier = Modifier.weight(1f)) {
@@ -371,49 +373,118 @@ fun CartScreen(navController: NavHostController) {
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(4.dp)
+            Button(
+                onClick = { showSummary = !showSummary },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                Text(if (showSummary) "Detayları Gizle ▲" else "Detayları Göster ▼")
+            }
+
+            if (showSummary) {
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(4.dp)
                 ) {
+                    Column {
 
-                    OutlinedTextField(
-                        value = discountText,
-                        onValueChange = { discountText = it },
-                        label = { Text("% İskonto") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
-                    )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = CartManager.kdvEnabled,
-                            onCheckedChange = { CartManager.kdvEnabled = it }
-                        )
-                        Text("KDV")
-                    }
+                            OutlinedTextField(
+                                value = discountText,
+                                onValueChange = { discountText = it },
+                                label = { Text("% İskonto") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
 
-                    Button(
-                        onClick = {
-                            val percent = discountText.toDoubleOrNull() ?: 0.0
-                            CartManager.applyDiscount(percent)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = CartManager.kdvEnabled,
+                                    onCheckedChange = { CartManager.kdvEnabled = it }
+                                )
+                                Text("KDV")
+                            }
+
+                            Button(
+                                onClick = {
+                                    val percent = discountText.toDoubleOrNull() ?: 0.0
+                                    CartManager.applyDiscount(percent)
+                                }
+                            ) {
+                                Text("Uygula")
+                            }
                         }
-                    ) {
-                        Text("Uygula")
+
+                        // 🔥 TOPLAMLAR BURADA
+                        val totals = CartManager.totalsByCurrency()
+
+                        totals.forEach { (currency, baseTotal) ->
+
+                            val tlValue = when (currency) {
+                                "USD" -> baseTotal * CartManager.usdRate
+                                "EUR" -> baseTotal * CartManager.eurRate
+                                "TL" -> baseTotal
+                                else -> baseTotal
+                            }
+
+                            val afterDiscount =
+                                tlValue * (1 - CartManager.appliedDiscountPercent / 100)
+
+                            val finalTL =
+                                if (CartManager.kdvEnabled)
+                                    afterDiscount * (1 + CartManager.kdvRate)
+                                else
+                                    afterDiscount
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+
+                                // 🔹 ÜSTTE GRİ TL (iskontolu + KDV'li)
+                                Text(
+                                    text = "≈ %.2f ₺".format(finalTL),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+
+                                // 🔹 ALTTA DÖVİZ (ASLINDAKİ FİYAT)
+                                Text(
+                                    text = when (currency) {
+                                        "USD" -> "%.2f $".format(baseTotal)
+                                        "EUR" -> "%.2f €".format(baseTotal)
+                                        "TL" -> "%.2f ₺".format(baseTotal)
+                                        else -> "$baseTotal"
+                                    },
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+
+                        val totalTL = CartManager.totalInTL()
+
+                        Text(
+                            text = "Genel Toplam: %.2f ₺".format(totalTL),
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color(0xFF2E7D32)
+                        )
                     }
                 }
             }
-
+            /*
             Spacer(Modifier.height(12.dp))
 
             // ✅ TOPLAMLAR
@@ -473,7 +544,7 @@ fun CartScreen(navController: NavHostController) {
                 text = "Genel Toplam (TL): %.2f ₺".format(totalTL),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color(0xFF2E7D32)
-            )
+            )*/
 
 
         }
