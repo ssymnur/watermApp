@@ -22,70 +22,132 @@ import androidx.navigation.NavHostController
 import com.example.watermapp.data.CartManager
 import com.example.watermapp.data.LoginPrefs
 import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.VisualTransformation
 
-    @Composable
-    fun LoginScreen(navController: NavHostController) {
-        val context = LocalContext.current
+@Composable
+fun LoginScreen(navController: NavHostController) {
+    var passwordVisible by remember { mutableStateOf(false) }
 
-        var username by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var showLogin by remember { mutableStateOf(false) }
-        var errorText by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var errorText by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        // 🔶 TURUNCU KUTU
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .padding(20.dp)
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 12.dp,
+                    shape = RoundedCornerShape(20.dp)
+                )
+                .clip(RoundedCornerShape(20.dp)) // 🔥 shadowdan sonra clip
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFFF9800),
+                            Color(0xFFFFA726)
+                        )
+                    )
+                )
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Text("Giriş", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                text = "PERSONEL GİRİŞ",
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.White
+            )
 
             Spacer(Modifier.height(20.dp))
 
-            // ✅ MÜŞTERİ GİRİŞİ
-            Button(onClick = {
-                CartManager.SessionManager.isStaff = false   // ← önemli
-                navController.navigate("categories")
-            }) {
-                Text("Müşteri Girişi")
-            }
+            OutlinedTextField(
+                value = username,
+                onValueChange = { username = it },
+                label = { Text("Kullanıcı Adı") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedLabelColor = Color.White,
+                    unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                    cursorColor = Color.White,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                )
+            )
 
             Spacer(Modifier.height(10.dp))
 
-            Button(onClick = { showLogin = true }) {
-                Text("Personel Girişi")
-            }
-
-            if (showLogin) {
-
-                Spacer(Modifier.height(20.dp))
-
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("Kullanıcı Adı") }
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Şifre") },
+                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            contentDescription = "Şifreyi Göster/Gizle",
+                            tint = Color.White
+                        )
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    unfocusedContainerColor = Color.White.copy(alpha = 0.2f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedLabelColor = Color.White,
+                    unfocusedLabelColor = Color.White.copy(alpha = 0.7f),
+                    cursorColor = Color.White,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
                 )
+            )
 
-                Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(15.dp))
 
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Şifre") }
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                Button(onClick = {
+            Button(
+                onClick = {
 
                     if (username == "waterm" && password == "waterm123") {
 
                         CartManager.SessionManager.isStaff = true
-
                         LoginPrefs.saveLogin(context, true)
 
-                        FirebaseAuth.getInstance()
-                            .signInAnonymously()
+                        FirebaseAuth.getInstance().signInAnonymously()
 
                         navController.navigate("categories") {
                             popUpTo("login") { inclusive = true }
@@ -95,11 +157,16 @@ import com.google.firebase.auth.FirebaseAuth
                         errorText = "Hatalı giriş!"
                     }
 
-                }) {
-                    Text("Giriş Yap")
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Giriş Yap")
+            }
 
-                Text(errorText, color = MaterialTheme.colorScheme.error)
+            if (errorText.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Text(errorText, color = Color.Red)
             }
         }
     }
+}

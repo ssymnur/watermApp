@@ -67,7 +67,10 @@ fun CartScreen(navController: NavHostController) {
 
     val cart = CartManager.cart
 
-    val projectItems = cart.filter { it.projectName != null }
+    val projectItems = cart.filter {
+        !it.projectName.isNullOrBlank() &&
+                !it.urun?.urun_adi.isNullOrBlank()
+    }
     val otherItems = cart.filter { it.projectName == null }
     val groupedProjects = projectItems.groupBy { it.projectInstanceId }
 
@@ -246,17 +249,49 @@ fun CartScreen(navController: NavHostController) {
 
                                 if (expandedProjects[instanceId ?: ""] == true) {
                                     items.forEach { item ->
+
+                                        if (item.urun?.urun_adi.isNullOrBlank()) return@forEach
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(start = 16.dp, bottom = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
+
+                                            // ✅ ÜRÜN ADI EKLE
                                             Text(
                                                 text = item.urun?.urun_adi ?: "",
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            Text("Adet: ${item.quantity.value}")
+
+                                            // ✅ ADET KONTROL
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+
+                                                IconButton(
+                                                    onClick = {
+                                                        if (item.quantity.value > 1) {
+                                                            item.quantity.value--
+                                                        } else {
+                                                            CartManager.cart.remove(item)
+                                                        }
+                                                    }
+                                                ) {
+                                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Azalt")
+                                                }
+
+                                                Text(
+                                                    text = item.quantity.value.toString(),
+                                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                                )
+
+                                                IconButton(
+                                                    onClick = { item.quantity.value++ }
+                                                ) {
+                                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Arttır")
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -306,11 +341,41 @@ fun CartScreen(navController: NavHostController) {
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+
+                                // ✅ ÜRÜN ADI GERİ GELDİ
                                 Text(
                                     text = item.urun?.urun_adi ?: "",
                                     modifier = Modifier.weight(1f)
                                 )
-                                Text("Adet: ${item.quantity.value}")
+
+                                // ✅ ADET KONTROL
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+
+                                    IconButton(
+                                        onClick = {
+                                            if (item.quantity.value > 1) {
+                                                item.quantity.value--
+                                            } else {
+                                                CartManager.cart.remove(item)
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Azalt")
+                                    }
+
+                                    Text(
+                                        text = item.quantity.value.toString(),
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+
+                                    IconButton(
+                                        onClick = { item.quantity.value++ }
+                                    ) {
+                                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Arttır")
+                                    }
+                                }
                             }
                         }
                     }

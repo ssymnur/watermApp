@@ -55,7 +55,14 @@ fun ProjeDetayScreen(
                 }
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(EndustriyelUrun::class.java)?.copy(id = doc.id)
+
+                    val item = doc.toObject(EndustriyelUrun::class.java)
+
+                    if (item?.urun_adi.isNullOrBlank()) {
+                        null // 🔥 boş ürünleri tamamen yok say
+                    } else {
+                        item.copy(id = doc.id)
+                    }
                 } ?: emptyList()
 
                 isLoading = false

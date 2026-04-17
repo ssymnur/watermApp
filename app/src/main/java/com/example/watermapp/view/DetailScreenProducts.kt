@@ -18,6 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,11 +51,13 @@ fun DetailScreenProducts(
     navController: NavHostController
 ) {
 
+    var searchQuery by remember { mutableStateOf("") }
+
     var urunler by remember {
         mutableStateOf<List<BaseUrun>>(emptyList())
     }
 
-    // 🔥 FIREBASE CANLI LİSTE (SEALED CLASS UYUMLU)
+    // 🔥 FIREBASE CANLI LİSTE
     DisposableEffect(anaKategori, kategoriAdi) {
 
         val listener = FirebaseFirestore.getInstance()
@@ -81,11 +84,26 @@ fun DetailScreenProducts(
 
                         else -> null
                     }
-
                 } ?: emptyList()
             }
 
         onDispose { listener.remove() }
+    }
+
+    // 🔥 SEARCH FILTER
+    val filteredUrunler = remember(searchQuery, urunler) {
+        val query = searchQuery.trim()
+
+        if (query.isBlank()) return@remember urunler
+
+        urunler.filter { urun ->
+
+            fun match(text: String?): Boolean =
+                text?.contains(query, ignoreCase = true) == true
+
+            match(urun.urun_adi) ||
+                    match(urun.marka)
+        }
     }
 
     Scaffold(
@@ -125,148 +143,136 @@ fun DetailScreenProducts(
 
     ) { padding ->
 
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
 
-            items(urunler) { urun ->
+            // 🔍 SEARCH BAR (DOĞRU YER)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Ürün ara...") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            )
 
-                val qty = CartManager.getQuantity(urun)
-                var expanded by remember { mutableStateOf(false) }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize()
+            ) {
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp)
-                ) {
+                items(filteredUrunler) { urun ->
 
-                    Row(
+                    val qty = CartManager.getQuantity(urun)
+                    var expanded by remember { mutableStateOf(false) }
+
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 6.dp)
                     ) {
 
-                        Column(modifier = Modifier.weight(1f)) {
-
-                            Text(
-                                urun.urun_adi,
-                                style = MaterialTheme.typography.titleMedium
-                            )
-
-                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
-
-                            urun.marka
-                                ?.takeIf { it.isNotBlank() }
-                                ?.let { Text("Marka: $it") }
-                            urun.urun_kodu?.let { Text("Kod: $it") }
-
-                            // 🔥 KATEGORİYE GÖRE TÜM ÖZELLİKLER
-
-                            when (urun) {
-
-                                is EvselUrun -> {
-                                    urun.pompa?.let { Text("Pompa: $it") }
-                                    urun.asama?.let { Text("Aşama: $it") }
-                                    urun.membran_gpd?.let { Text("Membran: $it GPD") }
-                                    urun.tank_galon?.let { Text("Tank: $it Galon") }
-                                }
-
-                                is EndustriyelUrun -> {
-                                    urun.model?.let { Text("Model: $it") }
-                                    urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
-                                    urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
-                                    urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
-                                }
-
-                                is PeyzajUrun -> {
-
-                                    urun.ebat?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Ebat: $it")
-                                    }
-
-                                    urun.istasyon_sayisi?.let {
-                                        Text("İstasyon Sayısı: $it")
-                                    }
-
-                                    urun.ambalaj_adedi?.let {
-                                        Text("Ambalaj Adedi: $it")
-                                    }
-
-                                    urun.tip?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Tip: $it")
-                                    }
-
-                                    urun.koli_adedi?.let {
-                                        Text("Koli Adedi: $it")
-                                    }
-
-                                    urun.kutu_adedi?.let {
-                                        Text("Kutu Adedi: $it")
-                                    }
-
-                                    urun.nozul_rengi?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Nozul: $it")
-                                    }
-
-                                    urun.atis_mesafesi?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Atış: $it")
-                                    }
-
-                                    urun.basinc_degeri?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Basınç: $it")
-                                    }
-
-                                    urun.tanim?.takeIf { it.isNotBlank() }?.let {
-                                        Text("Tanım: $it")
-                                    }
-                                }
-                                is KimyasalUrun -> {
-                                    urun.ambalaj_kg?.let { Text("Ambalaj/KG: $it") }
-                                    urun.kullanim_amaci?.let { Text("Kullanım Amacı: $it") }
-                                }
-                            }
-
-                            TextButton(onClick = { expanded = !expanded }) {
-                                Text(if (expanded) "Gizle" else "Açıklama")
-                            }
-
-                            if (expanded) {
-                                Text(
-                                    text = urun.ozellikler ?: "Bilgi yok",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-
-                            if (CartManager.SessionManager.isStaff) {
-                                TextButton(onClick = {
-                                    navController.navigate("edit/${urun.id}")
-                                }) {
-                                    Text("Düzenle")
-                                }
-                            }
-                        }
-
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
 
-                            IconButton(onClick = { CartManager.remove(urun) }) {
-                                Text("-", style = MaterialTheme.typography.headlineMedium)
+                            Column(modifier = Modifier.weight(1f)) {
+
+                                Text(
+                                    urun.urun_adi,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+
+                                Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
+
+                                urun.marka?.takeIf { it.isNotBlank() }?.let {
+                                    Text("Marka: $it")
+                                }
+
+                                urun.urun_kodu?.let {
+                                    Text("Kod: $it")
+                                }
+
+                                // 🔥 KATEGORİYE GÖRE DETAYLAR
+                                when (urun) {
+
+                                    is EvselUrun -> {
+                                        urun.pompa?.let { Text("Pompa: $it") }
+                                        urun.asama?.let { Text("Aşama: $it") }
+                                        urun.membran_gpd?.let { Text("Membran: $it GPD") }
+                                        urun.tank_galon?.let { Text("Tank: $it Galon") }
+                                    }
+
+                                    is EndustriyelUrun -> {
+                                        urun.model?.let { Text("Model: $it") }
+                                        urun.tank_baglanti?.let { Text("Tank Bağlantı: $it") }
+                                        urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
+                                        urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
+                                    }
+
+                                    is PeyzajUrun -> {
+                                        urun.ebat?.takeIf { it.isNotBlank() }?.let { Text("Ebat: $it") }
+                                        urun.istasyon_sayisi?.let { Text("İstasyon Sayısı: $it") }
+                                        urun.ambalaj_adedi?.let { Text("Ambalaj Adedi: $it") }
+                                        urun.tip?.takeIf { it.isNotBlank() }?.let { Text("Tip: $it") }
+                                        urun.koli_adedi?.let { Text("Koli Adedi: $it") }
+                                        urun.kutu_adedi?.let { Text("Kutu Adedi: $it") }
+                                        urun.nozul_rengi?.takeIf { it.isNotBlank() }?.let { Text("Nozul: $it") }
+                                        urun.atis_mesafesi?.takeIf { it.isNotBlank() }?.let { Text("Atış: $it") }
+                                        urun.basinc_degeri?.takeIf { it.isNotBlank() }?.let { Text("Basınç: $it") }
+                                        urun.tanim?.takeIf { it.isNotBlank() }?.let { Text("Tanım: $it") }
+                                    }
+
+                                    is KimyasalUrun -> {
+                                        urun.ambalaj_kg?.let { Text("Ambalaj/KG: $it") }
+                                        urun.kullanim_amaci?.let { Text("Kullanım Amacı: $it") }
+                                    }
+                                }
+
+                                TextButton(onClick = { expanded = !expanded }) {
+                                    Text(if (expanded) "Gizle" else "Açıklama")
+                                }
+
+                                if (expanded) {
+                                    Text(
+                                        text = urun.ozellikler ?: "Bilgi yok",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+
+                                if (CartManager.SessionManager.isStaff) {
+                                    TextButton(onClick = {
+                                        navController.navigate("edit/${urun.id}")
+                                    }) {
+                                        Text("Düzenle")
+                                    }
+                                }
                             }
 
-                            Text(
-                                text = qty.toString(),
-                                modifier = Modifier.width(32.dp),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
 
-                            IconButton(onClick = { CartManager.add(urun) }) {
-                                Text("+", style = MaterialTheme.typography.headlineMedium)
+                                IconButton(onClick = { CartManager.remove(urun) }) {
+                                    Text("-", style = MaterialTheme.typography.headlineMedium)
+                                }
+
+                                Text(
+                                    text = qty.toString(),
+                                    modifier = Modifier.width(32.dp),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+
+                                IconButton(onClick = { CartManager.add(urun) }) {
+                                    Text("+", style = MaterialTheme.typography.headlineMedium)
+                                }
                             }
                         }
                     }
