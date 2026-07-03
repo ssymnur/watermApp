@@ -273,20 +273,24 @@ import com.google.firebase.firestore.FirebaseFirestore
             }
             // YENİ ÜRÜN FORMU
             composable(
-                route = "add_product_form/{ana}/{alt}",
+                route = "add_product_form/{ana}/{ust}/{alt}",
                 arguments = listOf(
                     navArgument("ana") { type = NavType.StringType },
+                    navArgument("ust") { type = NavType.StringType },
                     navArgument("alt") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
 
-                val ana =
-                    backStackEntry.arguments?.getString("ana")?.fromNavArg() ?: ""
+                val ana = backStackEntry.arguments?.getString("ana")?.fromNavArg() ?: ""
+                val ust = backStackEntry.arguments?.getString("ust")?.fromNavArg() ?: ""
+                val alt = backStackEntry.arguments?.getString("alt")?.fromNavArg() ?: ""
 
-                val alt =
-                    backStackEntry.arguments?.getString("alt")?.fromNavArg() ?: ""
-
-                AddProductFormScreen(navController, ana, alt)
+                AddProductFormScreen(
+                    navController = navController,
+                    anaKategori = ana,
+                    ustKategori = ust,
+                    altKategori = alt
+                )
             }
 
             // KATEGORİLER
@@ -316,20 +320,24 @@ import com.google.firebase.firestore.FirebaseFirestore
             }
 
             composable(
-                route = "urunler/{ana}/{alt}",
+                route = "urunler/{ana}/{ust}/{alt}",
                 arguments = listOf(
                     navArgument("ana") { type = NavType.StringType },
+                    navArgument("ust") { type = NavType.StringType },
                     navArgument("alt") { type = NavType.StringType }
                 )
             ) { backStackEntry ->
 
-                val ana =
-                    backStackEntry.arguments?.getString("ana") ?: ""
+                val ana = backStackEntry.arguments?.getString("ana") ?: ""
+                val ust = backStackEntry.arguments?.getString("ust") ?: ""
+                val alt = backStackEntry.arguments?.getString("alt") ?: ""
 
-                val alt =
-                    backStackEntry.arguments?.getString("alt") ?: ""
-
-                DetailScreenProducts(ana, alt, navController)
+                DetailScreenProducts(
+                    anaKategori = ana,
+                    ustKategori = ust,
+                    altKategori = alt,
+                    navController = navController
+                )
             }
             composable(
                 route = "projeler/{kategori}",

@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.currentCompositeKeyHashCode
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +41,8 @@ fun CategoryScreen(navController: NavHostController) {
         Triple("Kimyasal", "kategori/Kimyasal", Icons.Default.Science),
         Triple("Peyzaj", "kategori/Peyzaj", Icons.Default.Park)
     )
+
+
 
 
     Column(

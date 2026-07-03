@@ -47,7 +47,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 @Composable
 fun DetailScreenProducts(
     anaKategori: String,
-    kategoriAdi: String,
+    ustKategori: String,
+    altKategori: String,
     navController: NavHostController
 ) {
 
@@ -58,12 +59,12 @@ fun DetailScreenProducts(
     }
 
     // 🔥 FIREBASE CANLI LİSTE
-    DisposableEffect(anaKategori, kategoriAdi) {
+    DisposableEffect(anaKategori, altKategori) {
 
         val listener = FirebaseFirestore.getInstance()
             .collection("products")
             .whereEqualTo("anaKategori", anaKategori)
-            .whereEqualTo("altKategori", kategoriAdi)
+            .whereEqualTo("altKategori", altKategori)
             .addSnapshotListener { snapshot, _ ->
 
                 urunler = snapshot?.documents?.mapNotNull { doc ->
@@ -110,7 +111,7 @@ fun DetailScreenProducts(
 
         topBar = {
             TopAppBar(
-                title = { Text(kategoriAdi) },
+                title = { Text(altKategori) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri")
@@ -120,7 +121,7 @@ fun DetailScreenProducts(
                     if (CartManager.SessionManager.isStaff) {
                         IconButton(onClick = {
                             navController.navigate(
-                                "add_product_form/${anaKategori.toNavArg()}/${kategoriAdi.toNavArg()}"
+                                "add_product_form/${anaKategori.toNavArg()}/${ustKategori.toNavArg()}/${altKategori.toNavArg()}"
                             )
                         }) {
                             Icon(Icons.Default.Add, contentDescription = "")
@@ -215,18 +216,40 @@ fun DetailScreenProducts(
                                         urun.giris_cikis_baglanti?.let { Text("Giriş/Çıkış: $it") }
                                         urun.debi_m3_saat?.let { Text("Debi: $it m3/saat") }
                                     }
-
                                     is PeyzajUrun -> {
-                                        urun.ebat?.takeIf { it.isNotBlank() }?.let { Text("Ebat: $it") }
-                                        urun.istasyon_sayisi?.let { Text("İstasyon Sayısı: $it") }
-                                        urun.ambalaj_adedi?.let { Text("Ambalaj Adedi: $it") }
-                                        urun.tip?.takeIf { it.isNotBlank() }?.let { Text("Tip: $it") }
-                                        urun.koli_adedi?.let { Text("Koli Adedi: $it") }
-                                        urun.kutu_adedi?.let { Text("Kutu Adedi: $it") }
-                                        urun.nozul_rengi?.takeIf { it.isNotBlank() }?.let { Text("Nozul: $it") }
-                                        urun.atis_mesafesi?.takeIf { it.isNotBlank() }?.let { Text("Atış: $it") }
-                                        urun.basinc_degeri?.takeIf { it.isNotBlank() }?.let { Text("Basınç: $it") }
-                                        urun.tanim?.takeIf { it.isNotBlank() }?.let { Text("Tanım: $it") }
+
+                                        if (ustKategori.trim().equals("RAINBIRD", ignoreCase = true)) {
+
+                                            urun.model?.let { Text("Model: $it") }
+                                            urun.urun_kodu?.let { Text("Kod: $it") }
+                                            urun.aciklama?.let { Text("Açıklama: $it") }
+
+                                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
+
+                                            urun.agirlik_kg?.let { Text("Ağırlık: $it") }
+                                            urun.bayii_adedi?.let { Text("Bayii Adedi: $it") }
+                                            urun.rainbird_koli_adedi?.let { Text("Koli Adedi: $it") }
+                                            urun.palet_adedi?.let { Text("Palet Adedi: $it") }
+
+                                        } else {
+                                            // POELSAN vs eski yapı
+                                            urun.ebat?.takeIf { it.isNotBlank() }?.let { Text("Ebat: $it") }
+                                            urun.istasyon_sayisi?.let { Text("İstasyon Sayısı: $it") }
+                                            urun.ambalaj_adedi?.let { Text("Ambalaj Adedi: $it") }
+                                            urun.tip?.takeIf { it.isNotBlank() }?.let { Text("Tip: $it") }
+                                            urun.koli_adedi?.let { Text("Koli Adedi: $it") }
+                                            urun.kutu_adedi?.let { Text("Kutu Adedi: $it") }
+                                            urun.nozul_rengi?.takeIf { it.isNotBlank() }?.let { Text("Nozul: $it") }
+                                            urun.atis_mesafesi?.takeIf { it.isNotBlank() }?.let { Text("Atış: $it") }
+                                            urun.basinc_degeri?.takeIf { it.isNotBlank() }?.let { Text("Basınç: $it") }
+                                            urun.tanim?.takeIf { it.isNotBlank() }?.let { Text("Tanım: $it") }
+                                            urun.model?.let { Text("Model: $it") }
+                                            urun.aciklama?.let { Text("Açıklama: $it") }
+                                            urun.agirlik_kg?.let { Text("Ağırlık: $it") }
+                                            urun.bayii_adedi?.let { Text("Bayii Adedi: $it") }
+                                            urun.rainbird_koli_adedi?.let { Text("Koli: $it") }
+                                            urun.palet_adedi?.let { Text("Palet: $it") }
+                                        }
                                     }
 
                                     is KimyasalUrun -> {

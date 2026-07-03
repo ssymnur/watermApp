@@ -1,5 +1,6 @@
 package com.example.watermapp.view
 
+import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.watermapp.toNavArg
 import com.google.firebase.firestore.FirebaseFirestore
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailScreenCategory(
@@ -49,79 +49,94 @@ fun DetailScreenCategory(
 
     var kategoriler by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    fun getStaticCategories(): List<String>? {
+
+        return when {
+
+            // 🔹 PEYZAJ ANA KATEGORİ
+            anaKategori == "Peyzaj" && ustKategori == null -> {
+                listOf("POELSAN", "RAINBIRD")
+            }
+
+            // 🔹 POELSAN
+            anaKategori == "Peyzaj" && ustKategori == "POELSAN" -> {
+                listOf(
+                    "CUP/BT PİLLİ SULAMA KONTROL ÜNİTESİ",
+                    "SPREYLER VE NOZULLAR",
+                    "ELEKTROFÜZYON VE SPİGOT EK PARÇALARI",
+                    "MAVİ SERİ",
+                    "YEŞİL SERİ",
+                    "PRİZ KOLYE",
+                    "PRİZ KOLYE GEÇMELİ",
+                    "LAYFLAT EK PARÇALARI",
+                    "DİŞLİ BAĞLANTI ELEMANLARI",
+                    "KÜRESEL VANALAR",
+                    "CAN SUYU VANA",
+                    "VANA KUTULARI",
+                    "PLASTİK FİLTRE",
+                    "MİNİ VANA (DN 8)",
+                    "MİNİ VANA (DN 15)",
+                    "HAT SONU TAHLİYE VANASI",
+                    "KİLİTLİ BAĞLANTI ELEMANLARI",
+                    "DAMLA SULAMA KURTAĞZI",
+                    "DAMLA SULAMA SOMUNLU",
+                    "YASSI DAMLA SULAMA SOMUNLU",
+                    "YASSI DAMLA SULAMA YÜZÜKLÜ",
+                    "MİNİ SPRİNKLER VE EK PARÇALARI",
+                    "HAT ÜSTÜ DAMLATICI"
+                )
+            }
+
+            // 🔹 RAINBIRD
+            anaKategori == "Peyzaj" && ustKategori == "RAINBIRD" -> {
+                listOf(
+                    "MIKRO / DAMLA SULAMA",
+                    "SPREY BASLIKLAR",
+                    "SPREY BASLIK NOZULLARI",
+                    "SPREY BASLIK AKSESUARLARI",
+                    "DÖNER (R-VAN) NOZULLAR",
+                    "1/2 POP-UP ROTOR SPRINKLER",
+                    "3/4 POP-UP ROTOR SPRINKLER",
+                    "SPREY BASLIKLAR VE ORTA MESAFE ROTORLAR İÇİN AKSESUARLAR",
+                    "1 POP-UP ROTOR",
+                    "1.5 POP-UP ROTOR",
+                    "VANALAR VE AKSESUARLARI",
+                    "ELEKTRIK KABLOLARI VE AKSESUARLARI",
+                    "POLYPRO & RAIN BIRD VANA KUTUSU SERISI",
+                    "KONTROL CIHAZLARI (ELEKTRIKLI)",
+                    "KONTROL CIHAZLARI (PILLI)",
+                    "MERKEZI SULAMA KONTROL SISTEMI"
+                )
+            }
+
+            // 🔹 KİMYASAL
+            anaKategori == "Kimyasal" && ustKategori == null -> {
+                listOf("Havuz")
+            }
+
+
+
+            else -> null
+        }
+    }
+
     DisposableEffect(anaKategori, ustKategori) {
 
-        // 🔹 1️⃣ PEYZAJ ANA KATEGORİ
-        if (anaKategori == "Peyzaj" && ustKategori == null) {
+        val static = getStaticCategories()
 
-            kategoriler = listOf("POELSAN", "RAINBIRD")
-
+        if (static != null) {
+            kategoriler = static
             onDispose { }
-
-        }
-
-        // 🔹 2️⃣ PEYZAJ → POELSAN ALT KATEGORİLERİ
-        else if (anaKategori == "Peyzaj" && ustKategori == "POELSAN") {
-
-            kategoriler = listOf(
-                "CUP/BT PİLLİ SULAMA KONTROL ÜNİTESİ",
-                "SPREYLER VE NOZULLAR",
-                "ELEKTROFÜZYON VE SPİGOT EK PARÇALARI",
-                "MAVİ SERİ",
-                "YEŞİL SERİ",
-                "PRİZ KOLYE",
-                "PRİZ KOLYE GEÇMELİ",
-                "LAYFLAT EK PARÇALARI",
-                "DİŞLİ BAĞLANTI ELEMANLARI",
-                "KÜRESEL VANALAR",
-                "CAN SUYU VANA",
-                "VANA KUTULARI",
-                "PLASTİK FİLTRE",
-                "MİNİ VANA (DN 8)",
-                "MİNİ VANA (DN 15)",
-                "HAT SONU TAHLİYE VANASI",
-                "KİLİTLİ BAĞLANTI ELEMANLARI",
-                "DAMLA SULAMA KURTAĞZI",
-                "DAMLA SULAMA SOMUNLU",
-                "YASSI DAMLA SULAMA SOMUNLU",
-                "YASSI DAMLA SULAMA YÜZÜKLÜ",
-                "MİNİ SPRİNKLER VE EK PARÇALARI",
-                "HAT ÜSTÜ DAMLATICI"
-            )
-
-            onDispose { }
-
-        }
-        // 🔹 KİMYASAL ANA KATEGORİ
-        else if (anaKategori == "Kimyasal" && ustKategori == null) {
-
-            kategoriler = listOf("Havuz")
-
-            onDispose { }
-        }
-
-        // 🔹 3️⃣ DİĞER KATEGORİLER (Firebase’den ÇEK)
-        else {
+        } else {
 
             val listener = FirebaseFirestore.getInstance()
                 .collection("products")
-                .addSnapshotListener { snapshot, error ->
-
-                    Log.d("FIREBASE", "snapshot size = ${snapshot?.size()}")
-                    Log.d("FIREBASE", "error = $error")
-
-                    snapshot?.documents?.forEach {
-                        Log.d("FIREBASE", it.data.toString())
-                    }
+                .addSnapshotListener { snapshot, _ ->
 
                     val list = snapshot?.documents
                         ?.mapNotNull { doc ->
-
                             val ana = doc.getString("anaKategori")
-
-                            if (ana == anaKategori)
-                                doc.getString("altKategori")
-                            else null
+                            if (ana == anaKategori) doc.getString("altKategori") else null
                         }
                         ?.distinct()
                         ?.sorted()
@@ -147,46 +162,27 @@ fun DetailScreenCategory(
                     )
                 },
                 navigationIcon = {
-                    IconButton(
-                        onClick = { navController.popBackStack() }
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Geri"
-                        )
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 }
             )
         },
 
-        bottomBar = {
-            BottomAppBar {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { navController.navigate("cart") }
-                    ) {
-                        Icon(
-                            Icons.Default.ShoppingCart,
-                            contentDescription = "Sepet"
-                        )
-                    }
-                }
-            }
-        },
-
         floatingActionButton = {
-            if (anaKategori == "Endüstriyel") {
+
+            // SADECE ANA KATEGORİLERDE GÖZÜKSÜN
+            if (anaKategori == "Endüstriyel" && ustKategori == null) {
+
                 FloatingActionButton(
                     onClick = {
-                        navController.navigate("projeler/Endüstriyel")
+                        navController.navigate(
+                            "projeler/${Uri.encode(anaKategori)}"
+                        )
                     }
                 ) {
                     Icon(
-                        Icons.Default.Folder,
+                        imageVector = Icons.Default.Folder,
                         contentDescription = "Projeler"
                     )
                 }
@@ -194,7 +190,6 @@ fun DetailScreenCategory(
         },
 
         floatingActionButtonPosition = FabPosition.End
-
     ) { padding ->
 
         LazyColumn(
@@ -203,6 +198,7 @@ fun DetailScreenCategory(
                 .padding(padding)
                 .padding(16.dp)
         ) {
+
             items(kategoriler) { kategori ->
 
                 Card(
@@ -213,17 +209,29 @@ fun DetailScreenCategory(
                         .padding(vertical = 8.dp)
                         .clickable {
 
-                            // 🔥 Eğer Peyzaj ana ekrandaysak → üst kategoriye git
-                            if (ustKategori == null && anaKategori == "Peyzaj") {
+                            if (ustKategori == null) {
 
-                                navController.navigate(
-                                    "detail/$anaKategori/${kategori.toNavArg()}"
-                                )
+                                when (anaKategori) {
+
+                                    "Peyzaj" -> {
+                                        // 🔥 2 aşamalı devam et
+                                        navController.navigate(
+                                            "detail/${anaKategori.toNavArg()}/${kategori.toNavArg()}"
+                                        )
+                                    }
+
+                                    "Evsel", "Endüstriyel", "Kimyasal" -> {
+                                        // 🔥 DİREKT ÜRÜNLERE GİT
+                                        navController.navigate(
+                                            "urunler/${anaKategori.toNavArg()}/GENEL/${kategori.toNavArg()}"
+                                        )
+                                    }
+                                }
 
                             } else {
-
+                                // 🔥 Peyzaj altından gelenler
                                 navController.navigate(
-                                    "urunler/$anaKategori/${kategori.toNavArg()}"
+                                    "urunler/${anaKategori.toNavArg()}/${ustKategori.toNavArg()}/${kategori.toNavArg()}"
                                 )
                             }
                         }

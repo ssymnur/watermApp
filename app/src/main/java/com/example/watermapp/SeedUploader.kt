@@ -59,6 +59,13 @@ object SeedUploader {
                         map["atis_mesafesi"] = urun.atis_mesafesi ?: ""
                         map["basinc_degeri"] = urun.basinc_degeri ?: ""
                         map["tanim"] = urun.tanim ?: ""
+                        map["model"] = urun.model ?: ""
+                        map["kod"] = urun.kod ?: ""
+                        map["aciklama"] = urun.aciklama ?: ""
+                        map["agirlik_kg"] = urun.agirlik_kg ?: ""
+                        map["bayii_adedi"] = urun.bayii_adedi ?: 0
+                        map["rainbird_koli_adedi"] = urun.rainbird_koli_adedi ?: 0
+                        map["palet_adedi"] = urun.palet_adedi ?: 0
                     }
                     is KimyasalUrun -> {
                         map["ambalaj_kg"] = urun.ambalaj_kg ?: ""

@@ -85,7 +85,16 @@ fun EditProductScreen(
 
     // ---------------- KATEGORİYE ÖZEL STATE ----------------
 
-    var model by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.model ?: "") }
+    //var model by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.model ?: "") }
+    var model by rememberSaveable {
+        mutableStateOf(
+            when (urun) {
+                is EndustriyelUrun -> urun.model ?: ""
+                is PeyzajUrun -> urun.model ?: ""
+                else -> ""
+            }
+        )
+    }
     var debi by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.debi_m3_saat?.toString() ?: "") }
 
     var pompa by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.pompa ?: "") }
@@ -110,6 +119,11 @@ fun EditProductScreen(
     var kullanimAmaci by rememberSaveable {
         mutableStateOf((urun as? KimyasalUrun)?.kullanim_amaci ?: "")
     }
+    var aciklama by rememberSaveable { mutableStateOf("") }
+    var agirlikKg by rememberSaveable { mutableStateOf("") }
+    var bayiiAdedi by rememberSaveable { mutableStateOf("") }
+    var koliAdediRain by rememberSaveable { mutableStateOf("") }
+    var paletAdedi by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -159,6 +173,19 @@ fun EditProductScreen(
 
                 is PeyzajUrun -> {
 
+                    if (urun.altKategori == "RAINBIRD") {
+
+                        item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
+                        item { OutlinedTextField(kod, { kod = it }, label = { Text("Kod") }) }
+                        item { OutlinedTextField(aciklama, { aciklama = it }, label = { Text("Açıklama") }) }
+
+                        item { OutlinedTextField(agirlikKg, { agirlikKg = it }, label = { Text("Ağırlık / KG") }) }
+                        item { OutlinedTextField(bayiiAdedi, { bayiiAdedi = it }, label = { Text("Bayii Adedi") }) }
+                        item { OutlinedTextField(koliAdediRain, { koliAdediRain = it }, label = { Text("Koli Adedi") }) }
+                        item { OutlinedTextField(paletAdedi, { paletAdedi = it }, label = { Text("Palet Adedi") }) }
+
+                    } else {
+
                     item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
                     item { OutlinedTextField(atis, { atis = it }, label = { Text("Atış Mesafesi") }) }
                     item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
@@ -168,10 +195,8 @@ fun EditProductScreen(
                     item { OutlinedTextField(tip, { tip = it }, label = { Text("Tip") }) }
                     item { OutlinedTextField(koli, { koli = it }, label = { Text("Koli Adedi") }) }
                     item { OutlinedTextField(kutu, { kutu = it }, label = { Text("Kutu Adedi") }) }
-                    item { OutlinedTextField(nozul, { nozul = it }, label = { Text("Nozul Rengi") }) }
-                    item { OutlinedTextField(basinc, { basinc = it }, label = { Text("Basınç") }) }
                     item { OutlinedTextField(tanim, { tanim = it }, label = { Text("Tanım") }) }
-                }
+                }}
                 is KimyasalUrun -> {
 
                     item {
@@ -275,7 +300,13 @@ fun EditProductScreen(
                                 tanim = tanim,
                                 urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
-                                paraBirimi = paraBirimi
+                                paraBirimi = paraBirimi ,
+                                model = model,
+                                aciklama = aciklama,
+                                agirlik_kg = agirlikKg,
+                                bayii_adedi = bayiiAdedi.toIntOrNull(),
+                                rainbird_koli_adedi = koliAdediRain.toIntOrNull(),
+                                palet_adedi = paletAdedi.toIntOrNull()
                             )
                             is KimyasalUrun -> urun.copy(
                                 urun_adi = urunAdi,

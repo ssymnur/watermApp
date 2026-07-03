@@ -38,6 +38,7 @@ import com.google.firebase.Firebase
 import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.String
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +46,7 @@ import kotlinx.coroutines.launch
 fun AddProductFormScreen(
     navController: NavHostController,
     anaKategori: String,
+    ustKategori: String,
     altKategori: String
 ) {
     //FİYAT
@@ -81,6 +83,13 @@ fun AddProductFormScreen(
     var tanim by rememberSaveable { mutableStateOf("") }
     var kutuAdedi by rememberSaveable { mutableStateOf("") }
     var basincDegeri by rememberSaveable { mutableStateOf("") }
+    var model by rememberSaveable { mutableStateOf("") }
+    var kodRain by rememberSaveable { mutableStateOf("") }
+    var aciklama by rememberSaveable { mutableStateOf("") }
+    var agirlikKg by rememberSaveable { mutableStateOf("") }
+    var bayiiAdedi by rememberSaveable { mutableStateOf("") }
+    var koliAdediRain by rememberSaveable { mutableStateOf("") }
+    var paletAdedi by rememberSaveable { mutableStateOf("") }
 
     //KİMYASAL
     var ambalajKg by rememberSaveable { mutableStateOf("") }
@@ -149,17 +158,31 @@ fun AddProductFormScreen(
                 }
 
                 "Peyzaj" -> {
-                    field(sayfa, { sayfa = it }, "Nozul Rengi")
-                    field(sayfaPdf, { sayfaPdf = it }, "Atış Mesafesi")
-                    field(ebat, { ebat = it }, "Ebat")
-                    field(istasyonSayisi, { istasyonSayisi = it }, "İstasyon Sayısı")
-                    field(ambalajAdedi, { ambalajAdedi = it }, "Ambalaj Adedi")
-                    field(tip, { tip = it }, "Tip")
-                    field(koliAdedi, { koliAdedi = it }, "Koli Adedi")
-                    field(kutuAdedi, { kutuAdedi = it }, "Kutu Adedi")
-                    field(basincDegeri, { basincDegeri = it }, "Basınç Değeri")
-                    field(tanim, { tanim = it }, "Tanım")
 
+                    if (ustKategori.trim().equals("RAINBIRD", ignoreCase = true)) {
+
+                        field(model, { model = it }, "Model")
+                        field(kodRain, { kodRain = it }, "Kod")
+                        field(aciklama, { aciklama = it }, "Açıklama")
+
+                        field(agirlikKg, { agirlikKg = it }, "Ağırlık / KG")
+                        field(bayiiAdedi, { bayiiAdedi = it }, "Bayii Adedi")
+                        field(koliAdediRain, { koliAdediRain = it }, "Koli Adedi")
+                        field(paletAdedi, { paletAdedi = it }, "Palet Adedi")
+
+                    } else {
+                        // POELSAN eski alanlar
+                        field(sayfa, { sayfa = it }, "Nozul Rengi")
+                        field(sayfaPdf, { sayfaPdf = it }, "Atış Mesafesi")
+                        field(ebat, { ebat = it }, "Ebat")
+                        field(istasyonSayisi, { istasyonSayisi = it }, "İstasyon Sayısı")
+                        field(ambalajAdedi, { ambalajAdedi = it }, "Ambalaj Adedi")
+                        field(tip, { tip = it }, "Tip")
+                        field(koliAdedi, { koliAdedi = it }, "Koli Adedi")
+                        field(kutuAdedi, { kutuAdedi = it }, "Kutu Adedi")
+                        field(basincDegeri, { basincDegeri = it }, "Basınç Değeri")
+                        field(tanim, { tanim = it }, "Tanım")
+                    }
                 }
                 "Kimyasal" -> {
                     field(ambalajKg, { ambalajKg = it }, "Ambalaj / KG")
@@ -240,26 +263,51 @@ fun AddProductFormScreen(
                                 ozellikler = ozellikler
                             )
 
-                            "Peyzaj" -> PeyzajUrun(
-                                anaKategori = anaKategori,
-                                altKategori = altKategori,
-                                urun_adi = urunAdi,
-                                marka = marka,
-                                urun_kodu = kod.ifBlank { null },
-                                ebat = ebat,
-                                istasyon_sayisi = istasyonSayisi.toIntOrNull(),
-                                ambalaj_adedi = ambalajAdedi.toIntOrNull(),
-                                tip = tip,
-                                koli_adedi = koliAdedi.toIntOrNull(),
-                                kutu_adedi = kutuAdedi.toIntOrNull(),
-                                nozul_rengi = sayfa,
-                                atis_mesafesi = sayfaPdf,
-                                basinc_degeri = basincDegeri,
-                                tanim = tanim,
-                                fiyat = fiyat.toDoubleOrNull(),
-                                paraBirimi = paraBirimi,
-                                ozellikler = ozellikler
-                            )
+                            "Peyzaj" -> {
+
+                                if (altKategori.trim().equals("RAINBIRD", ignoreCase = true)) {
+
+                                    PeyzajUrun(
+                                        anaKategori = anaKategori,
+                                        altKategori = altKategori,
+                                        urun_adi = urunAdi,
+                                        urun_kodu = kodRain.ifBlank { null },
+                                        fiyat = fiyat.toDoubleOrNull(),
+                                        paraBirimi = paraBirimi,
+
+                                        model = model,
+                                        aciklama = aciklama,
+                                        agirlik_kg = agirlikKg,
+                                        bayii_adedi = bayiiAdedi.toIntOrNull(),
+                                        rainbird_koli_adedi = koliAdediRain.toIntOrNull(),
+                                        palet_adedi = paletAdedi.toIntOrNull()
+                                    )
+
+                                } else {
+
+                                    PeyzajUrun(
+                                        anaKategori = anaKategori,
+                                        altKategori = altKategori,
+                                        urun_adi = urunAdi,
+                                        marka = marka,
+                                        urun_kodu = kod.ifBlank { null },
+                                        fiyat = fiyat.toDoubleOrNull(),
+                                        paraBirimi = paraBirimi,
+                                        ozellikler = ozellikler,
+
+                                        ebat = ebat,
+                                        istasyon_sayisi = istasyonSayisi.toIntOrNull(),
+                                        ambalaj_adedi = ambalajAdedi.toIntOrNull(),
+                                        tip = tip,
+                                        koli_adedi = koliAdedi.toIntOrNull(),
+                                        kutu_adedi = kutuAdedi.toIntOrNull(),
+                                        nozul_rengi = sayfa,
+                                        atis_mesafesi = sayfaPdf,
+                                        basinc_degeri = basincDegeri,
+                                        tanim = tanim
+                                    )
+                                }
+                            }
                             "Kimyasal" -> KimyasalUrun(
                                 anaKategori = anaKategori,
                                 altKategori = altKategori,

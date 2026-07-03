@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("com.android.application")
     id("com.google.gms.google-services")
+
 }
 
 android {
@@ -79,4 +80,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation("com.google.firebase:firebase-auth-ktx:22.3.1")
+
+
+
 }

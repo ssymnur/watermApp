@@ -46,7 +46,7 @@ data class EvselUrun(
     val membran_gpd: Double? = null,
     val tank_galon: Double? = null,
 
-) : BaseUrun()
+    ) : BaseUrun()
 
 // ---------------- ENDÜSTRİYEL ----------------
 
@@ -93,8 +93,16 @@ data class PeyzajUrun(
     val basinc_degeri: String? = null,
     val tanim: String? = null,
 
+    val model: String? = null,
+    val kod: String? = null,
+    val aciklama: String? = null,
+    val agirlik_kg: String? = null,
+    val bayii_adedi: Int? = null,
+    val rainbird_koli_adedi: Int? = null,
+    val palet_adedi: Int? = null
 
-) : BaseUrun()
+
+    ) : BaseUrun()
 
 // ---------------- KİMYASAL ----------------
 
