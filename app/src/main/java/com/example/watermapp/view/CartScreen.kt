@@ -260,32 +260,95 @@ fun CartScreen(navController: NavHostController) {
                                         ) {
 
                                             // ✅ ÜRÜN ADI EKLE
-                                            Text(
-                                                text = item.urun?.urun_adi ?: "",
+                                            Column(
                                                 modifier = Modifier.weight(1f)
-                                            )
+                                            ) {
+
+                                                Text(
+                                                    text = item.urun?.urun_adi ?: "",
+                                                    style = MaterialTheme.typography.titleMedium
+                                                )
+
+                                                val price = item.urun?.fiyat ?: 0.0
+
+                                                val currency = item.urun?.paraBirimi ?: "TL"
+
+                                                Text(
+                                                    text = when (currency) {
+                                                        "USD" -> "Birim Fiyat: ${MoneyFormatter.usd(price)}"
+                                                        "EUR" -> "Birim Fiyat: ${MoneyFormatter.eur(price)}"
+                                                        else -> "Birim Fiyat: ${MoneyFormatter.tl(price)}"
+                                                    },
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color.Gray
+                                                )
+
+                                                val tlPrice = when (currency) {
+
+                                                    "USD" -> price * CartManager.usdRate
+
+                                                    "EUR" -> price * CartManager.eurRate
+
+                                                    else -> price
+
+                                                }
+
+                                                Text(
+                                                    text = "Toplam: ${MoneyFormatter.tl(tlPrice * item.quantity.value)}",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = Color(0xFF2E7D32)
+                                                )
+
+                                            }
 
                                             // ✅ ADET KONTROL
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
 
-                                                IconButton(
-                                                    onClick = {
-                                                        if (item.quantity.value > 1) {
-                                                            item.quantity.value--
-                                                        } else {
-                                                            CartManager.cart.remove(item)
-                                                        }
-                                                    }
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally
                                                 ) {
-                                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Azalt")
-                                                }
 
-                                                Text(
-                                                    text = item.quantity.value.toString(),
-                                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                                )
+                                                    IconButton(
+                                                        onClick = {
+
+                                                            if (item.quantity.value > 1)
+                                                                item.quantity.value--
+                                                            else
+                                                                CartManager.cart.remove(item)
+
+                                                        }
+                                                    ) {
+
+                                                        Icon(
+                                                            Icons.Default.KeyboardArrowDown,
+                                                            null
+                                                        )
+
+                                                    }
+
+                                                    Text(
+                                                        text = "${item.quantity.value} Adet",
+                                                        style = MaterialTheme.typography.bodyMedium
+                                                    )
+
+                                                    IconButton(
+                                                        onClick = {
+
+                                                            item.quantity.value++
+
+                                                        }
+                                                    ) {
+
+                                                        Icon(
+                                                            Icons.Default.KeyboardArrowUp,
+                                                            null
+                                                        )
+
+                                                    }
+
+                                                }
 
                                                 IconButton(
                                                     onClick = { item.quantity.value++ }
@@ -344,10 +407,40 @@ fun CartScreen(navController: NavHostController) {
                             ) {
 
                                 // ✅ ÜRÜN ADI GERİ GELDİ
-                                Text(
-                                    text = item.urun?.urun_adi ?: "",
+                                Column(
                                     modifier = Modifier.weight(1f)
-                                )
+                                ) {
+
+                                    Text(
+                                        text = item.urun?.urun_adi ?: "",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+
+                                    val price = item.urun?.fiyat ?: 0.0
+                                    val currency = item.urun?.paraBirimi ?: "TL"
+
+                                    Text(
+                                        text = when (currency) {
+                                            "USD" -> "Birim Fiyat: ${MoneyFormatter.usd(price)}"
+                                            "EUR" -> "Birim Fiyat: ${MoneyFormatter.eur(price)}"
+                                            else -> "Birim Fiyat: ${MoneyFormatter.tl(price)}"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+
+                                    val tlPrice = when (currency) {
+                                        "USD" -> price * CartManager.usdRate
+                                        "EUR" -> price * CartManager.eurRate
+                                        else -> price
+                                    }
+
+                                    Text(
+                                        text = "Toplam: ${MoneyFormatter.tl(tlPrice * item.quantity.value)}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF2E7D32)
+                                    )
+                                }
 
                                 // ✅ ADET KONTROL
                                 Row(
