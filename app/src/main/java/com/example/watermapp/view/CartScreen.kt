@@ -55,6 +55,7 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.LaunchedEffect
+import com.example.watermapp.utils.MoneyFormatter
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -518,7 +519,7 @@ fun CartScreen(navController: NavHostController) {
 
                                 // 🔹 ÜSTTE GRİ TL (iskontolu + KDV'li)
                                 Text(
-                                    text = "≈ %.2f ₺".format(finalTL),
+                                    text = "≈ ${MoneyFormatter.tl(finalTL)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.Gray
                                 )
@@ -526,10 +527,10 @@ fun CartScreen(navController: NavHostController) {
                                 // 🔹 ALTTA DÖVİZ (ASLINDAKİ FİYAT)
                                 Text(
                                     text = when (currency) {
-                                        "USD" -> "%.2f $".format(baseTotal)
-                                        "EUR" -> "%.2f €".format(baseTotal)
-                                        "TL" -> "%.2f ₺".format(baseTotal)
-                                        else -> "$baseTotal"
+                                        "USD" -> MoneyFormatter.usd(baseTotal)
+                                        "EUR" -> MoneyFormatter.eur(baseTotal)
+                                        "TL" -> MoneyFormatter.tl(baseTotal)
+                                        else -> baseTotal.toString()
                                     },
                                     style = MaterialTheme.typography.headlineSmall
                                 )
@@ -541,7 +542,7 @@ fun CartScreen(navController: NavHostController) {
                         val totalTL = CartManager.totalInTL()
 
                         Text(
-                            text = "Genel Toplam: %.2f ₺".format(totalTL),
+                            text = "Genel Toplam: ${MoneyFormatter.tl(totalTL)}",
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.titleMedium,
                             color = Color(0xFF2E7D32)

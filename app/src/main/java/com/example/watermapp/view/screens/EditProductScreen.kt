@@ -96,6 +96,9 @@ fun EditProductScreen(
         )
     }
     var debi by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.debi_m3_saat?.toString() ?: "") }
+    var tankBaglanti by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.tank_baglanti ?: "") }
+    var girisCikis by rememberSaveable { mutableStateOf((urun as? EndustriyelUrun)?.giris_cikis_baglanti ?: "") }
+    var ozellikler by rememberSaveable { mutableStateOf(urun.ozellikler ?: "") }
 
     var pompa by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.pompa ?: "") }
     var asama by rememberSaveable { mutableStateOf((urun as? EvselUrun)?.asama ?: "") }
@@ -119,11 +122,25 @@ fun EditProductScreen(
     var kullanimAmaci by rememberSaveable {
         mutableStateOf((urun as? KimyasalUrun)?.kullanim_amaci ?: "")
     }
-    var aciklama by rememberSaveable { mutableStateOf("") }
-    var agirlikKg by rememberSaveable { mutableStateOf("") }
-    var bayiiAdedi by rememberSaveable { mutableStateOf("") }
-    var koliAdediRain by rememberSaveable { mutableStateOf("") }
-    var paletAdedi by rememberSaveable { mutableStateOf("") }
+    var aciklama by rememberSaveable {
+        mutableStateOf((urun as? PeyzajUrun)?.aciklama ?: "")
+    }
+
+    var agirlikKg by rememberSaveable {
+        mutableStateOf((urun as? PeyzajUrun)?.agirlik_kg ?: "")
+    }
+
+    var bayiiAdedi by rememberSaveable {
+        mutableStateOf((urun as? PeyzajUrun)?.bayii_adedi?.toString() ?: "")
+    }
+
+    var koliAdediRain by rememberSaveable {
+        mutableStateOf((urun as? PeyzajUrun)?.rainbird_koli_adedi?.toString() ?: "")
+    }
+
+    var paletAdedi by rememberSaveable {
+        mutableStateOf((urun as? PeyzajUrun)?.palet_adedi?.toString() ?: "")
+    }
 
     Scaffold(
         topBar = {
@@ -169,6 +186,9 @@ fun EditProductScreen(
 
                     item { OutlinedTextField(model, { model = it }, label = { Text("Model") }) }
                     item { OutlinedTextField(debi, { debi = it }, label = { Text("Debi (m³/saat)") }) }
+                    item { OutlinedTextField(tankBaglanti, { tankBaglanti = it }, label = { Text("Tank Bağlantı") }) }
+                    item { OutlinedTextField(girisCikis, { girisCikis = it }, label = { Text("Giriş / Çıkış") }) }
+                    item { OutlinedTextField(ozellikler, { ozellikler = it }, label = { Text("Özellikler") }) }
                 }
 
                 is PeyzajUrun -> {
@@ -282,7 +302,10 @@ fun EditProductScreen(
                                 debi_m3_saat = debi.toDoubleOrNull(),
                                 urun_kodu = kod.ifBlank { null },
                                 fiyat = fiyat.toDoubleOrNull(),
-                                paraBirimi = paraBirimi
+                                paraBirimi = paraBirimi,
+                                tank_baglanti = tankBaglanti,
+                                giris_cikis_baglanti = girisCikis,
+                                ozellikler = ozellikler
                             )
 
                             is PeyzajUrun -> urun.copy(

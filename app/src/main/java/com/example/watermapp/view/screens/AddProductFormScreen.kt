@@ -280,7 +280,8 @@ fun AddProductFormScreen(
                                         agirlik_kg = agirlikKg,
                                         bayii_adedi = bayiiAdedi.toIntOrNull(),
                                         rainbird_koli_adedi = koliAdediRain.toIntOrNull(),
-                                        palet_adedi = paletAdedi.toIntOrNull()
+                                        palet_adedi = paletAdedi.toIntOrNull(),
+                                        ozellikler = ozellikler
                                     )
 
                                 } else {
@@ -305,6 +306,7 @@ fun AddProductFormScreen(
                                         atis_mesafesi = sayfaPdf,
                                         basinc_degeri = basincDegeri,
                                         tanim = tanim
+
                                     )
                                 }
                             }

@@ -25,6 +25,7 @@ import com.example.watermapp.ui.theme.WaterAppTheme
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.watermapp.model.*
 import com.example.watermapp.view.LoginScreen
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,6 +49,11 @@ class MainActivity : ComponentActivity() {
                 else "login"
 
             WaterAppTheme {
+
+                LaunchedEffect(Unit) {
+                    CartManager.updateCurrencyRates()
+                }
+
                 AppNavigator(startDestination)
             }
         }

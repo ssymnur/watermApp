@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.watermapp.BaseUrun
 import java.util.UUID
+import com.example.watermapp.network.RetrofitClient
 
 object CartManager {
 
@@ -25,7 +26,7 @@ object CartManager {
 
     fun addProject(projeAdi: String, urunler: List<BaseUrun>) {
 
-        val newInstanceId = UUID.randomUUID().toString() // 🔥 HER EKLEMEDE YENİ ID
+        val newInstanceId = UUID.randomUUID().toString()
 
         urunler.forEach { urun ->
 
@@ -34,7 +35,7 @@ object CartManager {
                     urun = urun,
                     quantity = mutableStateOf(1),
                     projectName = projeAdi,
-                    projectInstanceId = newInstanceId // 💥 EN KRİTİK SATIR
+                    projectInstanceId = newInstanceId
                 )
             )
         }
@@ -115,6 +116,31 @@ object CartManager {
 
     object SessionManager {
         var isStaff by mutableStateOf(false)
+    }
+
+    suspend fun updateCurrencyRates() {
+
+        try {
+
+            val response =
+                RetrofitClient.api.getRates()
+
+            usdRate =
+                response.rates["TRY"] ?: usdRate
+
+            eurRate =
+                response.rates["EUR"]?.let {
+
+                    usdRate / it
+
+                } ?: eurRate
+
+        } catch (e: Exception) {
+
+            e.printStackTrace()
+
+        }
+
     }
 
 }

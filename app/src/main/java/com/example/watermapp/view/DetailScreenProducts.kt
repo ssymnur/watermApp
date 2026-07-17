@@ -221,10 +221,7 @@ fun DetailScreenProducts(
                                         if (ustKategori.trim().equals("RAINBIRD", ignoreCase = true)) {
 
                                             urun.model?.let { Text("Model: $it") }
-                                            urun.urun_kodu?.let { Text("Kod: $it") }
                                             urun.aciklama?.let { Text("Açıklama: $it") }
-
-                                            Text("Fiyat: ${urun.fiyat ?: "-"} ${urun.paraBirimi ?: ""}")
 
                                             urun.agirlik_kg?.let { Text("Ağırlık: $it") }
                                             urun.bayii_adedi?.let { Text("Bayii Adedi: $it") }
