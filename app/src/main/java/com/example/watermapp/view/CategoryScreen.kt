@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.Science
@@ -39,7 +40,8 @@ fun CategoryScreen(navController: NavHostController) {
         Triple("Evsel", "kategori/Evsel", Icons.Default.Home),
         Triple("Endüstriyel", "kategori/Endüstriyel", Icons.Default.Build),
         Triple("Kimyasal", "kategori/Kimyasal", Icons.Default.Science),
-        Triple("Peyzaj", "kategori/Peyzaj", Icons.Default.Park)
+        Triple("Peyzaj", "kategori/Peyzaj", Icons.Default.Park),
+        Triple("Projeler", "projeler", Icons.Default.Folder)
     )
 
 

@@ -349,12 +349,6 @@ fun CartScreen(navController: NavHostController) {
                                                     }
 
                                                 }
-
-                                                IconButton(
-                                                    onClick = { item.quantity.value++ }
-                                                ) {
-                                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Arttır")
-                                                }
                                             }
                                         }
                                     }

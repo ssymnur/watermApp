@@ -1,5 +1,6 @@
 package com.example.watermapp.data
 
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -122,25 +123,22 @@ object CartManager {
 
         try {
 
-            val response =
-                RetrofitClient.api.getRates()
+            val response = RetrofitClient.api.getRates()
 
-            usdRate =
-                response.rates["TRY"] ?: usdRate
+            Log.d("KUR", response.rates.toString())
 
-            eurRate =
-                response.rates["EUR"]?.let {
+            usdRate = response.rates["TRY"] ?: usdRate
 
-                    usdRate / it
+            eurRate = response.rates["EUR"]?.let {
+                usdRate / it
+            } ?: eurRate
 
-                } ?: eurRate
+            Log.d("KUR", "USD = $usdRate")
+            Log.d("KUR", "EUR = $eurRate")
 
         } catch (e: Exception) {
-
             e.printStackTrace()
-
         }
-
     }
 
 }

@@ -29,7 +29,6 @@ import kotlin.jvm.java
 @Composable
 fun ProjelerScreen(
     navController: NavHostController,
-    kategori: String
 ) {
 
     val db = FirebaseFirestore.getInstance()

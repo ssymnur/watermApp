@@ -339,21 +339,7 @@ import com.google.firebase.firestore.FirebaseFirestore
                     navController = navController
                 )
             }
-            composable(
-                route = "projeler/{kategori}",
-                arguments = listOf(
-                    navArgument("kategori") { type = NavType.StringType }
-                )
-            ) { backStackEntry ->
 
-                val kategori =
-                    backStackEntry.arguments?.getString("kategori") ?: ""
-
-                ProjelerScreen(
-                    navController = navController,
-                    kategori = kategori
-                )
-            }
 
             // SİPARİŞLER
             composable("orders") {
@@ -384,12 +370,10 @@ import com.google.firebase.firestore.FirebaseFirestore
             }
 
             // LOGIN
-            composable(
-                route = "projeler/{kategori}",
-                arguments = listOf(navArgument("kategori") { type = NavType.StringType })
-            ) { backStackEntry ->
-                val kategori = backStackEntry.arguments?.getString("kategori") ?: ""
-                ProjelerScreen(navController, kategori)
+            composable("projeler") {
+
+                ProjelerScreen(navController)
+
             }
 
             composable(
